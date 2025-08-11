@@ -1,0 +1,113 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+local velocidadeVoo = 110
+
+-- Posições fixas
+local lugar1Pos = Vector3.new(3412, 4, 2229)
+local lugarEspecialPos = Vector3.new(3495, 4, 2394)
+local lugar3Pos = Vector3.new(3475, 4, 2277)
+local novoLugarPos = Vector3.new(3326, 4, 2229)
+
+-- Função para encontrar ProximityPrompt mais próximo do personagem em um raio
+local function getPromptPerto(pos, raio)
+    raio = raio or 10
+    local prompts = {}
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local dist = (obj.Parent.Position - pos).Magnitude
+            if dist <= raio then
+                table.insert(prompts, obj)
+            end
+        end
+    end
+    if #prompts > 0 then
+        table.sort(prompts, function(a,b)
+            return (a.Parent.Position - pos).Magnitude < (b.Parent.Position - pos).Magnitude
+        end)
+        return prompts[1]
+    else
+        return nil
+    end
+end
+
+-- Função para posicionar personagem bem perto do prompt para ativar
+local function posicionarNoPrompt(prompt)
+    if not prompt or not prompt.Parent then
+        warn("Prompt inválido para posicionar.")
+        return
+    end
+    local partPrompt = prompt.Parent
+    humanoidRootPart.CFrame = CFrame.new(partPrompt.Position + Vector3.new(0, 3, 0))
+    wait(0.3)
+end
+
+-- Função para segurar o prompt por X segundos
+local function segurarPrompt(prompt, segundos)
+    if not prompt then
+        warn("Prompt inválido para segurar.")
+        return
+    end
+    posicionarNoPrompt(prompt)
+    prompt:InputHoldBegin()
+    local tempoSegurando = 0
+    while tempoSegurando < segundos do
+        tempoSegurando = tempoSegurando + RunService.Heartbeat:Wait()
+    end
+    prompt:InputHoldEnd()
+    wait(0.3)
+    print("Prompt ativado:", prompt.Parent.Name)
+end
+
+-- Função para voar até a posição (movimento suave terrestre)
+local function voarAte(pos)
+    local alvo = pos + Vector3.new(0, 3, 0)
+    while (humanoidRootPart.Position - alvo).Magnitude > 1 do
+        local direcao = (alvo - humanoidRootPart.Position).Unit
+        humanoidRootPart.CFrame = humanoidRootPart.CFrame + direcao * velocidadeVoo * RunService.Heartbeat:Wait()
+    end
+end
+
+while true do
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        player.CharacterAdded:Wait()
+    end
+    character = player.Character
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+
+    -- Lugar 1
+    voarAte(lugar1Pos)
+    local prompt1 = getPromptPerto(lugar1Pos, 10)
+    segurarPrompt(prompt1, 3)
+    wait(6)
+
+    -- Lugar especial
+    voarAte(lugarEspecialPos)
+    local promptEspecial = getPromptPerto(lugarEspecialPos, 10)
+    segurarPrompt(promptEspecial, 4)
+
+    -- Lugar 3
+    voarAte(lugar3Pos)
+    local prompt3 = getPromptPerto(lugar3Pos, 10)
+    segurarPrompt(prompt3, 3)
+    wait(6)
+
+    -- Lugar especial
+    voarAte(lugarEspecialPos)
+    local promptEspecial = getPromptPerto(lugarEspecialPos, 10)
+    segurarPrompt(promptEspecial, 5)
+
+    -- Novo lugar
+    voarAte(novoLugarPos)
+    local promptNovo = getPromptPerto(novoLugarPos, 10)
+    segurarPrompt(promptNovo, 6)
+
+    -- Voltar para lugar especial
+    voarAte(lugarEspecialPos)
+    segurarPrompt(promptEspecial, 4)
+end
