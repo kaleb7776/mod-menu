@@ -1,0 +1,98 @@
+-- LocalScript (StarterPlayerScripts)
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
+
+local player = Players.LocalPlayer
+
+-- CONFIGURAÇÕES
+local delayEntreMensagens = 3-- tempo entre mensagens (segundos)
+
+-- Função para converter número para extenso (formal, sem "e")
+local function numeroPorExtensoFormal(n)
+	local unidades = { "ZERO", "UM", "DOIS", "TRÊS", "QUATRO", "CINCO", "SEIS", "SETE", "OITO", "NOVE" }
+	local especiais = { [10]="DEZ", [11]="ONZE", [12]="DOZE", [13]="TREZE", [14]="QUATORZE", [15]="QUINZE", [16]="DEZESSEIS", [17]="DEZESSETE", [18]="DEZOITO", [19]="DEZENOVE" }
+	local dezenas = { "", "", "VINTE", "TRINTA", "QUARENTA", "CINQUENTA", "SESSENTA", "SETENTA", "OITENTA", "NOVENTA" }
+	local centenas = { "", "CEM", "DUZENTOS", "TREZENTOS" }
+
+	if n < 10 then
+		return unidades[n+1]
+	elseif n < 20 then
+		return especiais[n]
+	elseif n < 100 then
+		local dez = math.floor(n / 10)
+		local uni = n % 10
+		if uni == 0 then
+			return dezenas[dez]
+		else
+			return dezenas[dez] .. " " .. unidades[uni+1]
+		end
+	else
+		if n == 100 then return "CEM" end
+		if n == 200 then return "DUZENTOS" end
+		if n == 300 then return "TREZENTOS" end
+		local cen = math.floor(n / 100)
+		local resto = n % 100
+		if resto == 0 then
+			return centenas[cen]
+		else
+			return centenas[cen] .. " " .. numeroPorExtensoFormal(resto)
+		end
+	end
+end
+
+-- Criar UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local textBox = Instance.new("TextBox")
+textBox.Size = UDim2.new(0, 200, 0, 50)
+textBox.Position = UDim2.new(0.5, -100, 0.5, -25)
+textBox.PlaceholderText = "Digite um número (0-300)"
+textBox.Text = ""
+textBox.Parent = screenGui
+textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textBox.ClearTextOnFocus = false
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 200, 0, 50)
+button.Position = UDim2.new(0.5, -100, 0.5, 40)
+button.Text = "OK"
+button.Parent = screenGui
+button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Quando clicar no botão
+button.MouseButton1Click:Connect(function()
+	local numeroFinal = tonumber(textBox.Text)
+	if numeroFinal and numeroFinal >= 0 and numeroFinal <= 300 then
+		screenGui:Destroy()
+
+		-- Pega humanoid e animação
+		local character = player.Character or player.CharacterAdded:Wait()
+		local humanoid = character:WaitForChild("Humanoid")
+		local animation = ReplicatedStorage:WaitForChild("Animationsfolder"):WaitForChild("JJS")
+		local animTrack = humanoid:LoadAnimation(animation)
+
+		-- Começa loop da animação em paralelo
+task.spawn(function()
+	for _ = 1, numeroFinal do
+		animTrack:Play()
+		task.wait(3)
+	end
+	animTrack:Stop()
+end)
+
+		-- Contagem formal no chat
+for i = 1, numeroFinal do
+	local mensagem = numeroPorExtensoFormal(i) .. "!"
+	TextChatService.TextChannels.RBXGeneral:SendAsync(mensagem)
+	task.wait(delayEntreMensagens)
+end
+
+	else
+		textBox.Text = "Número inválido!"
+	end
+end)
