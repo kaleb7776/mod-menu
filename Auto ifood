@@ -1,0 +1,74 @@
+-- LocalScript
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local root = char:WaitForChild("HumanoidRootPart")
+
+local workspace = game:GetService("Workspace")
+
+-- ======== Funções ========
+
+-- Voo rente ao chão (mantém altura fixa)
+local function voarAte(destinoPos)
+    local alturaY = root.Position.Y -- mantém altura atual do player
+    local destino = Vector3.new(destinoPos.X, alturaY, destinoPos.Z)
+
+    local info = TweenInfo.new(
+        (root.Position - destino).Magnitude / 30, -- velocidade proporcional
+        Enum.EasingStyle.Linear
+    )
+
+    local tween = TweenService:Create(root, info, {CFrame = CFrame.new(destino)})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- Achar o primeiro Pad válido
+local function getPadComPrompt()
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Parent and obj.Parent.Name == "OrderChar" then
+            return obj.Parent.Parent, obj -- retorna o Pad e o Prompt
+        end
+    end
+end
+
+-- ======== Loop Infinito ========
+
+task.spawn(function()
+    while task.wait(1) do
+        -- 1) Dispara o ProximityPrompt da Pizza
+        local pizza = workspace.Construcoes.Pizzaria.ifoodplace.Pizza3
+        local pizzaPrompt = pizza:WaitForChild("ProximityPrompt")
+
+        fireproximityprompt(pizzaPrompt)
+        print("Passo 1: ProximityPrompt da Pizza disparado")
+
+        -- 2) Espera 3 segundos
+        task.wait(3)
+
+        -- 3) Vai até o Pad com OrderChar
+        local pad, prompt = getPadComPrompt()
+        if pad and prompt then
+            voarAte(pad.Position)
+
+            -- 4) Dispara o Prompt do Pad
+            fireproximityprompt(prompt)
+            print("Passo 4: Prompt do Pad disparado")
+
+            -- 5) Espera 2 segundos
+            task.wait(2)
+
+            -- 6) Voa rente ao chão até a posição fixa (3314, 4, 3025)
+            local destino = Vector3.new(3314, 4, 3025)
+            voarAte(destino)
+
+            -- 7) Dispara de novo o ProximityPrompt da Pizza
+            fireproximityprompt(pizzaPrompt)
+            print("Passo 7: ProximityPrompt da Pizza disparado de novo")
+        else
+            warn("Nenhum Pad com OrderChar + ProximityPrompt encontrado.")
+        end
+    end
+end)
