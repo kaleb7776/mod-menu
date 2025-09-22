@@ -1,0 +1,102 @@
+- SERVIÇOS
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Camera = workspace.CurrentCamera
+
+local WeaponFired = ReplicatedStorage:WaitForChild("WeaponsSystem"):WaitForChild("Network"):WaitForChild("WeaponFired")
+local WeaponHit = ReplicatedStorage:WaitForChild("WeaponsSystem"):WaitForChild("Network"):WaitForChild("WeaponHit")
+
+-- VARIÁVEIS
+local aimbotAtivo = true   -- sempre ligado ao executar
+local wallCheck = false
+local FOV = 50  -- alterado para 20
+
+-- WALL CHECK
+local function temParede(origem, destino)
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {LocalPlayer.Character}
+	params.FilterType = Enum.RaycastFilterType.Blacklist
+	params.IgnoreWater = true
+
+	local direction = (destino - origem)
+	local resultado = workspace:Raycast(origem, direction, params)
+
+	if resultado then
+		local parte = resultado.Instance
+		if parte:IsDescendantOf(LocalPlayer.Character) then
+			return false
+		end
+		for _, player in pairs(Players:GetPlayers()) do
+			if player.Character and parte:IsDescendantOf(player.Character) then
+				return false
+			end
+		end
+		return true
+	end
+	return false
+end
+
+-- MELHOR ALVO DENTRO DO FOV
+local function getAlvoDentroDoFOV()
+	local melhorDist = math.huge
+	local melhorAlvo = nil
+	local viewportSize = Camera.ViewportSize
+	local center = Vector2.new(viewportSize.X/2, viewportSize.Y/2)
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
+			local humanoid = player.Character.Humanoid
+			if humanoid.Health > 0 then
+				local headPos, visivel = Camera:WorldToViewportPoint(player.Character.Head.Position)
+				if visivel then
+					local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
+					if dist <= FOV then
+						if not wallCheck or not temParede(Camera.CFrame.Position, player.Character.Head.Position) then
+							if dist < melhorDist then
+								melhorDist = dist
+								melhorAlvo = player.Character
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return melhorAlvo
+end
+
+-- DISPARO AUTOMÁTICO
+WeaponFired.OnClientEvent:Connect(function()
+	if not aimbotAtivo then return end
+	local arma = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+	if not arma then return end
+
+	local alvo = getAlvoDentroDoFOV()
+	if alvo and alvo:FindFirstChild("Head") then
+		local args = {
+			arma,
+			{
+				p = alvo.Head.Position,
+				pid = 1,
+				part = alvo.Head,
+				d = 0,
+				maxDist = 100,
+				h = alvo.Head,
+				m = Enum.Material.Plastic,
+				n = Vector3.new(0, 1, 0),
+				t = 0.5,
+				sid = 1
+			},
+			true
+		}
+		WeaponHit:FireServer(unpack(args))
+	end
+end)
+
+-- FUNÇÃO PÚBLICA PARA DESLIGAR AIMBOT
+_G.DesligarAimbot = function()
+	aimbotAtivo = false
+	print("Aimbot desligado!")
+end
