@@ -7,28 +7,33 @@ local Camera = workspace.CurrentCamera
 local WeaponFired = ReplicatedStorage:WaitForChild("WeaponsSystem"):WaitForChild("Network"):WaitForChild("WeaponFired")
 local WeaponHit = ReplicatedStorage:WaitForChild("WeaponsSystem"):WaitForChild("Network"):WaitForChild("WeaponHit")
 
--- VARIÁVEIS
-local aimbotAtivo = true   -- sempre ligado ao executar
+-- CONFIG
+local FOV = 20
 local wallCheck = true
-local FOV = 20   -- alterado para 20
 
--- WALL CHECK
+-- Contagem de tiros por jogador
+local shotCounters = {}
+local deathConns = {}
+
+-- Util: retorna parte de peito (HumanoidRootPart, UpperTorso, Torso)
+local function getChestPart(character)
+	if not character then return nil end
+	return character:FindFirstChild("HumanoidRootPart")
+		or character:FindFirstChild("UpperTorso")
+		or character:FindFirstChild("Torso")
+end
+
+-- Wall check
 local function temParede(origem, destino)
 	local params = RaycastParams.new()
 	params.FilterDescendantsInstances = {LocalPlayer.Character}
 	params.FilterType = Enum.RaycastFilterType.Blacklist
 	params.IgnoreWater = true
 
-	local direction = (destino - origem)
-	local resultado = workspace:Raycast(origem, direction, params)
-
+	local resultado = workspace:Raycast(origem, destino - origem, params)
 	if resultado then
-		local parte = resultado.Instance
-		if parte:IsDescendantOf(LocalPlayer.Character) then
-			return false
-		end
-		for _, player in pairs(Players:GetPlayers()) do
-			if player.Character and parte:IsDescendantOf(player.Character) then
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p.Character and resultado.Instance:IsDescendantOf(p.Character) then
 				return false
 			end
 		end
@@ -37,25 +42,27 @@ local function temParede(origem, destino)
 	return false
 end
 
--- MELHOR ALVO DENTRO DO FOV
-local function getAlvoDentroDoFOV()
-	local melhorDist = math.huge
-	local melhorAlvo = nil
-	local viewportSize = Camera.ViewportSize
-	local center = Vector2.new(viewportSize.X/2, viewportSize.Y/2)
+-- Melhor alvo dentro do FOV
+local function getAlvo()
+	local melhor, melhorDist
+	melhorDist = math.huge
+	local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
-	for _, player in pairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
-			local humanoid = player.Character.Humanoid
-			if humanoid.Health > 0 then
-				local headPos, visivel = Camera:WorldToViewportPoint(player.Character.Head.Position)
-				if visivel then
-					local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-					if dist <= FOV then
-						if not wallCheck or not temParede(Camera.CFrame.Position, player.Character.Head.Position) then
-							if dist < melhorDist then
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character then
+			local hum = p.Character:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 then
+				local chest = getChestPart(p.Character)
+				local head = p.Character:FindFirstChild("Head")
+				local pos = chest and chest.Position or (head and head.Position)
+				if pos then
+					local screenPos, vis = Camera:WorldToViewportPoint(pos)
+					if vis then
+						local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+						if dist <= FOV and dist < melhorDist then
+							if not wallCheck or not temParede(Camera.CFrame.Position, pos) then
 								melhorDist = dist
-								melhorAlvo = player.Character
+								melhor = p
 							end
 						end
 					end
@@ -63,40 +70,85 @@ local function getAlvoDentroDoFOV()
 			end
 		end
 	end
-
-	return melhorAlvo
+	return melhor
 end
 
--- DISPARO AUTOMÁTICO
+-- Reset contador quando alvo morre
+local function bindDeath(player)
+	if deathConns[player] then deathConns[player]:Disconnect() end
+	if player.Character then
+		local hum = player.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			deathConns[player] = hum.Died:Connect(function()
+				shotCounters[player] = 0
+			end)
+		end
+	end
+end
+
+for _, pl in ipairs(Players:GetPlayers()) do
+	shotCounters[pl] = 0
+	pl.CharacterAdded:Connect(function() bindDeath(pl) end)
+	if pl.Character then bindDeath(pl) end
+end
+
+Players.PlayerAdded:Connect(function(pl)
+	shotCounters[pl] = 0
+	pl.CharacterAdded:Connect(function() bindDeath(pl) end)
+end)
+
+Players.PlayerRemoving:Connect(function(pl)
+	shotCounters[pl] = nil
+	if deathConns[pl] then deathConns[pl]:Disconnect() end
+end)
+
+-- Envia hit fake
+local function sendHit(arma, targetPart, position)
+	if not arma or not targetPart or not position then return end
+	local args = {
+		arma,
+		{
+			p = position,
+			pid = 1,
+			part = targetPart,
+			d = 0,
+			maxDist = 100,
+			h = targetPart,
+			m = targetPart.Material or Enum.Material.Plastic,
+			n = Vector3.new(0,1,0),
+			t = 0.5,
+			sid = 1
+		},
+		true
+	}
+	WeaponHit:FireServer(unpack(args))
+end
+
+-- PRINCIPAL: a cada tiro
 WeaponFired.OnClientEvent:Connect(function()
-	if not aimbotAtivo then return end
 	local arma = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
 	if not arma then return end
 
-	local alvo = getAlvoDentroDoFOV()
-	if alvo and alvo:FindFirstChild("Head") then
-		local args = {
-			arma,
-			{
-				p = alvo.Head.Position,
-				pid = 1,
-				part = alvo.Head,
-				d = 0,
-				maxDist = 100,
-				h = alvo.Head,
-				m = Enum.Material.Plastic,
-				n = Vector3.new(0, 1, 0),
-				t = 0.5,
-				sid = 1
-			},
-			true
-		}
-		WeaponHit:FireServer(unpack(args))
+	local alvo = getAlvo()
+	if not alvo or not alvo.Character then return end
+	local chest = getChestPart(alvo.Character)
+	local head = alvo.Character:FindFirstChild("Head")
+
+	shotCounters[alvo] = (shotCounters[alvo] or 0) + 1
+
+	if shotCounters[alvo] >= 3 and head then
+		-- 3º tiro vai na cabeça
+		if not wallCheck or not temParede(Camera.CFrame.Position, head.Position) then
+			sendHit(arma, head, head.Position)
+			shotCounters[alvo] = 0
+			return
+		end
+	end
+
+	-- Senão, vai no peito
+	if chest then
+		if not wallCheck or not temParede(Camera.CFrame.Position, chest.Position) then
+			sendHit(arma, chest, chest.Position)
+		end
 	end
 end)
-
--- FUNÇÃO PÚBLICA PARA DESLIGAR AIMBOT
-_G.DesligarAimbot = function()
-	aimbotAtivo = false
-	print("Aimbot desligado!")
-end
