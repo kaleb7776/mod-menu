@@ -8,7 +8,7 @@ local WeaponFired = ReplicatedStorage:WaitForChild("WeaponsSystem"):WaitForChild
 local WeaponHit = ReplicatedStorage:WaitForChild("WeaponsSystem"):WaitForChild("Network"):WaitForChild("WeaponHit")
 
 -- CONFIG
-local FOV = 20
+local FOV = 10
 local wallCheck = true
 
 -- Contagem de tiros por jogador
