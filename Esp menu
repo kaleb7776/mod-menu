@@ -1,0 +1,150 @@
+--// Ultra Clean ESP Final + Tool
+-- Caixa fina + Nome (com distância) + Vida + Esqueleto + Tool na mão
+-- Funciona mesmo em respawn e novos jogadores
+-- Distância máxima = 300 studs
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local MaxDistance = 300
+
+-- Criar desenho
+local function NewDrawing(type, props)
+    local obj = Drawing.new(type)
+    for i,v in pairs(props) do
+        obj[i] = v
+    end
+    return obj
+end
+
+-- Criar ESP para um jogador
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+
+    local box = NewDrawing("Square", {Visible=false, Thickness=1, Color=Color3.fromRGB(0,255,0), Filled=false})
+    local nameTag = NewDrawing("Text", {Visible=false, Size=12, Center=true, Outline=false, Font=2, Color=Color3.fromRGB(200,200,200)})
+    local toolTag = NewDrawing("Text", {Visible=false, Size=12, Center=true, Outline=false, Font=2, Color=Color3.fromRGB(150,200,255)})
+    local healthLine = NewDrawing("Line", {Visible=false, Thickness=2})
+    local skeleton = {}
+
+    local bones = {
+        {"Head","UpperTorso"},
+        {"UpperTorso","LowerTorso"},
+        {"UpperTorso","LeftUpperArm"},
+        {"LeftUpperArm","LeftLowerArm"},
+        {"UpperTorso","RightUpperArm"},
+        {"RightUpperArm","RightLowerArm"},
+        {"LowerTorso","LeftUpperLeg"},
+        {"LeftUpperLeg","LeftLowerLeg"},
+        {"LowerTorso","RightUpperLeg"},
+        {"RightUpperLeg","RightLowerLeg"},
+    }
+    for i=1,#bones do
+        skeleton[i] = NewDrawing("Line", {Visible=false, Color=Color3.fromRGB(0,255,0), Thickness=1})
+    end
+
+    -- Atualizador de ESP
+    local function UpdateESP()
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hrp and hum and hum.Health > 0 then
+            local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local dist = myHRP and (hrp.Position - myHRP.Position).Magnitude or 9999
+
+            if dist <= MaxDistance then
+                local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    local head = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
+                    local foot = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                    local height = math.abs(head.Y - foot.Y)
+                    local width = height / 2
+                    local x = vector.X - width/2
+                    local y = head.Y
+
+                    -- Caixa
+                    box.Size = Vector2.new(width, height)
+                    box.Position = Vector2.new(x, y)
+                    box.Visible = true
+
+                    -- Nome + distância
+                    nameTag.Text = player.Name .. " ["..math.floor(dist).."m]"
+                    nameTag.Position = Vector2.new(vector.X, y - 14)
+                    nameTag.Visible = true
+
+                    -- Tool na mão
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then
+                        toolTag.Text = "["..tool.Name.."]"
+                        toolTag.Position = Vector2.new(vector.X, y + height + 5)
+                        toolTag.Visible = true
+                    else
+                        toolTag.Visible = false
+                    end
+
+                    -- Vida (linha fina)
+                    local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    healthLine.From = Vector2.new(x - 4, y + height)
+                    healthLine.To = Vector2.new(x - 4, y + height * (1 - hp))
+                    healthLine.Color = Color3.fromRGB(255 - 255*hp, 255*hp, 0)
+                    healthLine.Visible = true
+
+                    -- Esqueleto
+                    for i,bone in ipairs(bones) do
+                        local p1, p2 = bone[1], bone[2]
+                        if char:FindFirstChild(p1) and char:FindFirstChild(p2) then
+                            local p1v, s1 = Camera:WorldToViewportPoint(char[p1].Position)
+                            local p2v, s2 = Camera:WorldToViewportPoint(char[p2].Position)
+                            if s1 and s2 then
+                                skeleton[i].From = Vector2.new(p1v.X, p1v.Y)
+                                skeleton[i].To = Vector2.new(p2v.X, p2v.Y)
+                                skeleton[i].Visible = true
+                            else
+                                skeleton[i].Visible = false
+                            end
+                        else
+                            skeleton[i].Visible = false
+                        end
+                    end
+                else
+                    box.Visible, nameTag.Visible, toolTag.Visible, healthLine.Visible = false, false, false, false
+                    for _,line in ipairs(skeleton) do line.Visible = false end
+                end
+            else
+                box.Visible, nameTag.Visible, toolTag.Visible, healthLine.Visible = false, false, false, false
+                for _,line in ipairs(skeleton) do line.Visible = false end
+            end
+        else
+            box.Visible, nameTag.Visible, toolTag.Visible, healthLine.Visible = false, false, false, false
+            for _,line in ipairs(skeleton) do line.Visible = false end
+        end
+    end
+
+    -- Atualização contínua
+    RunService.RenderStepped:Connect(UpdateESP)
+
+    -- Reaplica se o jogador renascer
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        while player.Character do
+            RunService.RenderStepped:Wait()
+            UpdateESP()
+        end
+    end)
+end
+
+-- Criar ESP para todos os players atuais
+for _,p in ipairs(Players:GetPlayers()) do
+    CreateESP(p)
+end
+
+-- Criar ESP para quem entrar depois
+Players.PlayerAdded:Connect(CreateESP)
+
+-- Garantir que você mesmo também não bugue ao morrer
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+end)
