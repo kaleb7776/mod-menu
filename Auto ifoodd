@@ -101,7 +101,7 @@ task.spawn(function()
         local pad, prompt = getPadComPrompt()
         if pad and prompt then
             voarAte(pad.Position)
-            dispararPrompt(prompt)
+        
 
             task.wait(2)
 
