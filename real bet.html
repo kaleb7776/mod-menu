@@ -1,1 +1,620 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bet Fictício — Demo (Mobile Friendly)</title>
+  <meta name="description" content="Site de apostas com dinheiro fictício — UI laranja/preto. Admins só podem editar partidas e odds." />
+  <style>
+    /* Reset e tipografia */
+    *{box-sizing:border-box;margin:0;padding:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    html,body,#app{height:100%}
+
+    :root{
+      --orange:#ff7a18;
+      --orange-2:#ff8a3d;
+      --bg:#0b0b0b;
+      --card:#0f0f0f;
+      --muted:#9aa0a6;
+      --glass: rgba(255,255,255,0.04);
+      --accent-text:#111;
+      --success:#4ade80;
+      --danger:#ff7a7a;
+    }
+
+    /* Base */
+    html{font-size:16px}
+    body{background:linear-gradient(180deg,var(--bg),#060606);color:white;padding:16px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+    .container{max-width:1100px;margin:0 auto}
+
+    /* Responsive typography */
+    h1{font-size:clamp(18px,2.6vw,22px)}
+    h2{font-size:clamp(18px,3.2vw,24px)}
+
+    /* Header */
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(90deg,var(--orange),var(--orange-2));padding:12px;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.5)}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:48px;height:48px;background:#000;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:var(--orange)}
+    .brand h1{color:#0b0b0b}
+    .brand p{color:#0b0b0b;font-size:12px;margin-top:2px}
+
+    /* Controls — stack on small screens */
+    .controls{display:flex;align-items:center;gap:10px}
+    .controls-wrap{display:flex;gap:8px;align-items:center}
+    input,button,select{font-family:inherit}
+    input[type='text'],input[type='password'],input[type='number'],select{padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff}
+    button{cursor:pointer;border:0;padding:10px 12px;border-radius:10px;transition:all .16s ease}
+    .btn-orange{background:var(--card);color:var(--orange);border:1px solid rgba(0,0,0,0.2)}
+    .btn-primary{background:var(--orange);color:var(--accent-text);font-weight:700}
+    .btn-dark{background:#131313;color:var(--orange)}
+
+    /* Layout */
+    main{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:14px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 6px 20px rgba(0,0,0,0.45)}
+
+    .matches{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .match{padding:12px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);display:flex;flex-direction:column;gap:8px;transition:transform .14s ease, box-shadow .14s ease}
+    .match:active{transform:translateY(0)}
+    .match .teams{display:flex;justify-content:space-between;align-items:center}
+    .teams .title{font-weight:800;font-size:16px}
+
+    .kickoff{font-size:12px;color:var(--muted)}
+    .odds{display:flex;gap:8px;margin-top:8px}
+    .odd{flex:1;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.36));text-align:center}
+    .odd .team{font-size:13px;color:var(--muted)}
+    .odd .value{font-weight:900;font-size:18px;margin-top:6px}
+    .odd button{margin-top:8px;padding:10px 12px;border-radius:10px;min-width:44px}
+
+    .countdown{font-size:12px;color:var(--muted);margin-top:6px}
+
+    .status-open{color:var(--success);font-weight:800}
+    .status-finished{color:var(--danger);font-weight:800}
+
+    aside .section{margin-bottom:14px}
+    .balance{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .history{max-height:380px;overflow:auto;margin-top:8px}
+    .history-item{padding:10px;border-radius:10px;background:rgba(255,255,255,0.02);display:flex;justify-content:space-between;margin-bottom:8px}
+
+    /* Modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:90;padding:16px}
+    .modal{width:100%;max-width:680px;background:#0d0d0d;padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+
+    /* admin panel */
+    .admin-box{margin-top:12px;border-top:1px dashed rgba(255,255,255,0.04);padding-top:12px}
+    .users-list{max-height:220px;overflow:auto;margin-top:8px}
+    .user-item{display:flex;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px}
+
+    /* Toast */
+    .toast{position:fixed;right:16px;bottom:16px;background:#0b0b0b;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120}
+
+    /* Responsive adjustments for mobile */
+    @media (max-width:980px){
+      header{padding:12px}
+      .controls{flex-wrap:wrap}
+      main{grid-template-columns:1fr}
+      .matches{grid-template-columns:1fr}
+      .logo{width:44px;height:44px}
+      .brand h1{font-size:16px}
+      .card{padding:12px}
+      .odd button{width:100%;padding:12px}
+      .controls-wrap input, .controls-wrap button{min-width:0}
+      .modal{max-width:100%;padding:12px;border-radius:10px}
+      .history{max-height:260px}
+      /* Make inputs and selects full width on small screens */
+      input[type='text'], input[type='number'], select {width:100%;}
+      #name-input{flex:1}
+    }
+
+    @media (max-width:480px){
+      body{padding:12px}
+      header{border-radius:10px;padding:10px}
+      .logo{width:40px;height:40px}
+      .brand h1{font-size:15px}
+      .odd .value{font-size:16px}
+      .odd .team{font-size:12px}
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container" id="app">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden>BF</div>
+        <div>
+          <h1>Bet Fictício</h1>
+          <p>Dinheiro fictício • UI laranja/preto</p>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div id="user-area"></div>
+        <div class="controls-wrap" style="display:flex;gap:8px;align-items:center">
+          <input id="admin-pass" type="password" placeholder="Senha admin" aria-label="Senha admin" />
+          <button id="admin-login" class="btn-dark" title="Entrar como administrador">Entrar Admin</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <div>
+              <h2 style="font-size:20px">Próximas Partidas</h2>
+              <div style="color:var(--muted);font-size:13px">Apostas com dinheiro fictício</div>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="sort-select" aria-label="Ordenar">
+                <option value="kickoff">Ordenar: Próxima</option>
+                <option value="popular">Ordenar: Odds mais baixas</option>
+              </select>
+              <div style="font-size:13px;color:var(--muted)">Saldo inicial: R$ 2.000.000</div>
+            </div>
+          </div>
+
+          <div id="matches" class="matches" style="margin-top:12px" aria-live="polite"></div>
+
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3>Histórico de Apostas</h3>
+          <div id="bets-history" class="history" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <aside>
+        <div class="card section">
+          <div class="balance">
+            <div>
+              <div style="font-size:13px;color:var(--muted)">Sua Conta</div>
+              <div id="acct-name" style="font-weight:700;font-size:16px;margin-top:6px">—</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:12px;color:var(--muted)">Saldo</div>
+              <div id="acct-balance" style="font-weight:800;font-size:16px;color:var(--orange);">R$ 0</div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <input id="name-input" type="text" placeholder="Seu nome" aria-label="Nome" />
+            <button id="login-btn" class="btn-dark">Entrar / Registrar</button>
+          </div>
+
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+            <button id="quick-25" class="btn-orange" title="Apostar 25% do saldo atual">25%</button>
+            <button id="quick-50" class="btn-orange" title="Apostar 50% do saldo atual">50%</button>
+            <button id="quick-100" class="btn-orange" title="Apostar 100% do saldo atual">100%</button>
+          </div>
+
+          <div style="margin-top:10px">
+            <button id="reset-balance" class="btn-orange">Resetar saldo para 2kk</button>
+          </div>
+        </div>
+
+        <div class="card section">
+          <h4>Como Apostar</h4>
+          <ol style="color:var(--muted);margin-top:8px;font-size:13px">
+            <li>Entre com seu nome (saldo inicial R$ 2.000.000)</li>
+            <li>Escolha a partida e o time</li>
+            <li>Insira o valor e confirme</li>
+            <li>Admin finaliza a partida e paga automaticamente</li>
+          </ol>
+        </div>
+
+        <div id="admin-panel-placeholder"></div>
+      </aside>
+    </main>
+
+    <footer>
+      Feito para uso fictício — sem dinheiro real. Começo com R$ 2.000.000 por usuário.
+    </footer>
+  </div>
+
+  <!-- Simple toast -->
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <script>
+    (function(){
+      // Configuráveis
+      const ADMIN_PASS = 'admin123'; // troque aqui se quiser
+      const STARTING_BALANCE = 2000000; // 2kk
+
+      // LocalStorage keys
+      const LS = {
+        users: 'bet_users_html',
+        matches: 'bet_matches_html',
+        bets: 'bet_bets_html',
+        current: 'bet_current_html',
+        isAdmin: 'bet_is_admin_html'
+      };
+
+      // Helpers
+      const uid = ()=>Math.random().toString(36).slice(2,9);
+      const money = n => Number(n).toLocaleString('pt-BR');
+      const qs = s => document.querySelector(s);
+      const toastEl = qs('#toast');
+      function showToast(text, ms=2200){ toastEl.textContent = text; toastEl.style.display='block'; setTimeout(()=>toastEl.style.display='none', ms); }
+
+      // State
+      let users = JSON.parse(localStorage.getItem(LS.users) || '{}');
+      let matches = JSON.parse(localStorage.getItem(LS.matches) || '[]');
+      let bets = JSON.parse(localStorage.getItem(LS.bets) || '[]');
+      let currentUserId = localStorage.getItem(LS.current) || null;
+      let isAdmin = JSON.parse(localStorage.getItem(LS.isAdmin) || 'false');
+
+      // Seed matches if empty
+      if(matches.length === 0){
+        // Seed com os jogos da série A e amistosos do usuário
+        const mk = (hm)=>{ try{ const d=new Date(); const parts = hm.split(':'); const h = Number(parts[0]||0); const m = Number(parts[1]||0); d.setHours(h, m, 0, 0); if(d.getTime() < Date.now()) d.setDate(d.getDate()+1); return d.toISOString(); }catch(e){ return new Date(Date.now()+3600*1000).toISOString(); }};
+
+        matches = [
+          // Série A
+          { id: uid(), teamA: 'JUNIORS', teamB: 'CENTRAL (CNL)', oddA: 1.90, oddB: 1.95, kickoff: mk('10:00'), status: 'open', winner: null, competition: 'Série A' },
+          { id: uid(), teamA: 'FERRO NV (F)', teamB: 'ESTRELA NEGRA', oddA: 2.10, oddB: 1.70, kickoff: mk('11:00'), status: 'open', winner: null, competition: 'Série A' },
+          { id: uid(), teamA: 'LEÃO DO MATO', teamB: 'PORTUCALENSE', oddA: 1.85, oddB: 2.05, kickoff: mk('12:00'), status: 'open', winner: null, competition: 'Série A' },
+          { id: uid(), teamA: 'MAYERSA', teamB: 'ATLÉTICO ALEMÃO', oddA: 2.00, oddB: 1.80, kickoff: mk('13:00'), status: 'open', winner: null, competition: 'Série A' },
+
+          // Amistosos (lista do usuário)
+          { id: uid(), teamA: 'EC GAÚCHO', teamB: 'IMORTAL', oddA: 1.70, oddB: 2.00, kickoff: mk('12:00'), status: 'open', winner: null, competition: 'Amistoso' },
+          { id: uid(), teamA: 'LUA E MAR', teamB: 'ATLÉTICO', oddA: 1.95, oddB: 1.95, kickoff: mk('12:00'), status: 'open', winner: null, competition: 'Amistoso' },
+          { id: uid(), teamA: 'NOVA ERA', teamB: 'DYNAMO', oddA: 1.90, oddB: 2.00, kickoff: mk('12:30'), status: 'open', winner: null, competition: 'Amistoso' },
+          { id: uid(), teamA: 'MAYERSA', teamB: 'CENTRAL', oddA: 1.80, oddB: 2.00, kickoff: mk('13:30'), status: 'open', winner: null, competition: 'Amistoso' },
+          { id: uid(), teamA: 'SERRA GAÚCHA', teamB: 'IMORTAL', oddA: 2.10, oddB: 1.65, kickoff: mk('14:00'), status: 'open', winner: null, competition: 'Amistoso' },
+          { id: uid(), teamA: 'REAL CELESTE', teamB: 'JUNIORS', oddA: 1.85, oddB: 2.05, kickoff: mk('16:00'), status: 'open', winner: null, competition: 'Amistoso' },
+          { id: uid(), teamA: 'SPARTA', teamB: 'BRASILEIRINHO', oddA: 1.95, oddB: 1.95, kickoff: mk('17:00'), status: 'open', winner: null, competition: 'Amistoso' }
+        ];
+        saveMatches();
+      }
+
+      // Save helpers
+      function saveUsers(){ localStorage.setItem(LS.users, JSON.stringify(users)); }
+      function saveMatches(){ localStorage.setItem(LS.matches, JSON.stringify(matches)); }
+      function saveBets(){ localStorage.setItem(LS.bets, JSON.stringify(bets)); }
+      function saveCurrent(){ localStorage.setItem(LS.current, currentUserId || ''); }
+      function saveIsAdmin(){ localStorage.setItem(LS.isAdmin, JSON.stringify(isAdmin)); }
+
+      // UI refs
+      const matchesEl = qs('#matches');
+      const historyEl = qs('#bets-history');
+      const acctName = qs('#acct-name');
+      const acctBal = qs('#acct-balance');
+      const userArea = qs('#user-area');
+      const nameInput = qs('#name-input');
+      const loginBtn = qs('#login-btn');
+      const resetBtn = qs('#reset-balance');
+      const adminPassInput = qs('#admin-pass');
+      const adminLoginBtn = qs('#admin-login');
+      const adminPanelPlaceholder = qs('#admin-panel-placeholder');
+      const sortSelect = qs('#sort-select');
+
+      // Render loop
+      function render(){
+        renderMatches();
+        renderHistory();
+        renderAccount();
+        renderUserArea();
+        renderAdminPanel();
+      }
+
+      function formatKickoff(iso){ try{ return new Date(iso).toLocaleString(); }catch(e){return iso} }
+
+      function getCountdown(iso){
+        const diff = new Date(iso) - Date.now();
+        if(diff<=0) return 'Já começou';
+        const s = Math.floor(diff/1000%60);
+        const m = Math.floor(diff/60000%60);
+        const h = Math.floor(diff/3600000%24);
+        const d = Math.floor(diff/86400000);
+        if(d>0) return `${d}d ${h}h`;
+        if(h>0) return `${h}h ${m}m`;
+        return `${m}m ${s}s`;
+      }
+
+      function renderMatches(){
+        // optional sort
+        const by = sortSelect.value;
+        let list = [...matches];
+        if(by==='kickoff') list.sort((a,b)=> new Date(a.kickoff)-new Date(b.kickoff));
+        if(by==='popular') list.sort((a,b)=> (a.oddA+a.oddB) - (b.oddA+b.oddB));
+
+        matchesEl.innerHTML = '';
+        list.forEach(m => {
+          const div = document.createElement('article'); div.className='match card'; div.setAttribute('role','article');
+          const kickoff = formatKickoff(m.kickoff);
+          div.innerHTML = `
+            <div class="teams"><div><div class="kickoff">${kickoff} ${m.competition? '• ' + m.competition : ''}</div><div class="title">${m.teamA} <span style="font-weight:400">x</span> ${m.teamB}</div></div>
+            <div style="text-align:right"><div style="font-size:12px;color:var(--muted)">Status</div><div class="${m.status==='open'?'status-open':'status-finished'}">${m.status}</div></div></div>
+            <div class="odds">
+              <div class="odd"><div class="team">${m.teamA}</div><div class="value">${m.oddA.toFixed(2)}</div><div class="countdown">${getCountdown(m.kickoff)}</div><button data-id="${m.id}" data-side="A" class="btn-primary" aria-label="Apostar ${m.teamA}">Apostar</button></div>
+              <div class="odd"><div class="team">${m.teamB}</div><div class="value">${m.oddB.toFixed(2)}</div><div class="countdown">${getCountdown(m.kickoff)}</div><button data-id="${m.id}" data-side="B" class="btn-primary" aria-label="Apostar ${m.teamB}">Apostar</button></div>
+            </div>
+          `;
+
+          if(isAdmin){
+            const adminBtns = document.createElement('div'); adminBtns.style.marginTop='12px'; adminBtns.style.display='flex'; adminBtns.style.gap='8px';
+            adminBtns.innerHTML = `
+              <button data-edit="${m.id}" class="btn-orange">Editar Odds</button>
+              <button data-edit-modal="${m.id}" class="btn-dark">Editar (Modal)</button>
+              <button data-finish="${m.id}" class="btn-dark">Finalizar</button>
+              <button data-toggle="${m.id}" class="btn-orange">Toggle Status</button>
+            `;
+            div.appendChild(adminBtns);
+          }
+
+          matchesEl.appendChild(div);
+        });
+
+        // Attach event listeners for bet buttons
+        matchesEl.querySelectorAll('button[data-id]').forEach(btn=>{
+          btn.onclick = ()=>{
+            const id = btn.getAttribute('data-id');
+            const side = btn.getAttribute('data-side');
+            openBetModal(id, side);
+          };
+        });
+
+        if(isAdmin){
+          matchesEl.querySelectorAll('button[data-edit]').forEach(b=>{
+            b.onclick = ()=>{
+              const id = b.getAttribute('data-edit');
+              const m = matches.find(x=>x.id===id); if(!m) return;
+              const newA = prompt('Nova odd time A:', String(m.oddA));
+              const newB = prompt('Nova odd time B:', String(m.oddB));
+              if(newA && newB){ updateMatch(id,{oddA:parseFloat(newA), oddB:parseFloat(newB)}); showToast('Odds atualizadas'); }
+            };
+          });
+
+          matchesEl.querySelectorAll('button[data-edit-modal]').forEach(b=>{
+            b.onclick = ()=>{
+              const id = b.getAttribute('data-edit-modal'); openAdminEditModal(id);
+            };
+          });
+
+          matchesEl.querySelectorAll('button[data-finish]').forEach(b=>{
+            b.onclick = ()=>{
+              const id = b.getAttribute('data-finish');
+              const match = matches.find(x=>x.id===id);
+              if(!match) return;
+              const winnerA = confirm(`Definir vencedor: ${match.teamA}? OK = ${match.teamA}, Cancel = ${match.teamB}`) ? 'A' : 'B';
+              finishMatch(id, winnerA);
+            };
+          });
+
+          matchesEl.querySelectorAll('button[data-toggle]').forEach(b=>{
+            b.onclick = ()=>{
+              const id = b.getAttribute('data-toggle');
+              const m = matches.find(x=>x.id===id); if(!m) return; m.status = m.status==='open'?'finished':'open'; saveMatches(); render();
+            };
+          });
+        }
+      }
+
+      function openBetModal(matchId, sideDefault){
+        if(!currentUserId) return alert('Faça login para apostar.');
+        const match = matches.find(m=>m.id===matchId); if(!match) return;
+        if(match.status!=='open') return alert('Partida fechada');
+
+        // prevent multiple modals
+        if(document.querySelector('.modal-bg')) return;
+
+        // create modal
+        const modalBg = document.createElement('div'); modalBg.className='modal-bg'; modalBg.setAttribute('role','dialog'); modalBg.setAttribute('aria-modal','true');
+        const modal = document.createElement('div'); modal.className='modal';
+        modal.innerHTML = `
+          <h3>Apostar — ${match.teamA} x ${match.teamB}</h3>
+          <div style="color:var(--muted);font-size:13px">Kickoff: ${formatKickoff(match.kickoff)}</div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-direction:column">
+            <label style="width:100%"><div style="font-size:12px;color:var(--muted)">Time</div>
+              <select id="select-side" style="width:100%;padding:10px;border-radius:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.06)">
+                <option value="A">${match.teamA} (odd ${match.oddA.toFixed(2)})</option>
+                <option value="B">${match.teamB} (odd ${match.oddB.toFixed(2)})</option>
+              </select>
+            </label>
+            <label style="width:100%"><div style="font-size:12px;color:var(--muted)">Valor (R$)</div>
+              <input id="bet-value" type="number" value="10000" min="1" style="width:100%;padding:10px;border-radius:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.06)" />
+            </label>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button id="confirm-bet" class="btn-primary">Confirmar</button><button id="cancel-bet" class="btn-dark">Cancelar</button></div>
+        `;
+        modalBg.appendChild(modal); document.body.appendChild(modalBg);
+
+        qs('#select-side').value = sideDefault==='A'?'A':'B';
+
+        // focus trap simple
+        qs('#bet-value').focus();
+        function close(){ modalBg.remove(); }
+        qs('#cancel-bet').addEventListener('click', close);
+        qs('#confirm-bet').addEventListener('click', ()=>{
+          const side = qs('#select-side').value; const val = Number(qs('#bet-value').value);
+          if(!Number.isFinite(val) || val<=0) return alert('Informe um valor válido');
+          placeBet(matchId, side, val);
+          close();
+        });
+
+        // close on ESC
+        document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
+      }
+
+      function placeBet(matchId, side, amount){
+        const user = users[currentUserId]; if(!user) return alert('Usuário não encontrado');
+        if(!Number.isFinite(amount) || amount<=0) return alert('Valor inválido');
+        if(amount>user.balance) return alert('Saldo insuficiente');
+        const match = matches.find(m=>m.id===matchId); if(!match) return alert('Partida inválida');
+
+        const odd = side==='A'?match.oddA:match.oddB;
+        // deduct
+        user.balance = user.balance - amount;
+        user.history = user.history||[];
+        const betId = uid();
+        user.history.push({id:betId, matchId, matchTitle:`${match.teamA} x ${match.teamB}`, amount, outcome: side, odd, status:'pending', placedAt:new Date().toISOString()});
+        users[currentUserId] = user; saveUsers();
+
+        // save bet global
+        bets.unshift({id:betId,userId:currentUserId,matchId,amount,outcome:side,odd,status:'pending',placedAt:new Date().toISOString()}); saveBets();
+
+        render(); showToast('Aposta registrada');
+      }
+
+      function renderHistory(){
+        historyEl.innerHTML = '';
+        bets.forEach(b=>{
+          const d = document.createElement('div'); d.className='history-item';
+          d.innerHTML = `<div><div style="font-weight:700">${b.matchTitle || '—'}</div><div style="font-size:12px;color:var(--muted)">${b.outcome==='A'?'Time A':'Time B'} • R$ ${money(b.amount)} • Odd ${b.odd.toFixed(2)}</div></div><div style="text-align:right"><div style="font-weight:700;color:${b.status==='pending'? 'var(--orange)': b.status==='won'? '#7fffb1':'#ff9b9b'}">${b.status.toUpperCase()}</div>${b.payout? '<div style="font-size:12px;color:var(--muted)">Payout: R$ '+money(b.payout)+'</div>':''}</div>`;
+          historyEl.appendChild(d);
+        });
+      }
+
+      function renderAccount(){
+        if(currentUserId && users[currentUserId]){
+          acctName.textContent = users[currentUserId].name;
+          acctBal.textContent = 'R$ ' + money(users[currentUserId].balance);
+        } else {
+          acctName.textContent = '—'; acctBal.textContent = 'R$ 0';
+        }
+      }
+
+      function renderUserArea(){
+        userArea.innerHTML = '';
+        if(currentUserId && users[currentUserId]){
+          const u = users[currentUserId];
+          const wrap = document.createElement('div'); wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.gap='10px';
+          wrap.innerHTML = `<div style="font-size:13px;color:var(--muted)">Olá,</div><div style="font-weight:900">${u.name}</div><div style="background:#000;padding:8px;border-radius:8px;color:var(--orange);font-weight:800">R$ ${money(u.balance)}</div><button id="logout-btn" class="btn-dark">Sair</button>`;
+          userArea.appendChild(wrap);
+          qs('#logout-btn').addEventListener('click', ()=>{ currentUserId=null; isAdmin=false; saveCurrent(); saveIsAdmin(); render(); showToast('Logout efetuado'); });
+        } else {
+          const wrap = document.createElement('div'); wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.gap='8px';
+          wrap.innerHTML = `<input id="mini-name" type="text" placeholder="Seu nome" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff" /><button id="mini-login" class="btn-dark">Entrar</button>`;
+          userArea.appendChild(wrap);
+          qs('#mini-login').addEventListener('click', ()=>{ const v = qs('#mini-name').value.trim(); if(v) registerOrLogin(v); });
+        }
+      }
+
+      // Quick bet buttons (fill bet-value with % of balance)
+      qs('#quick-25')?.addEventListener('click', ()=>{ if(!currentUserId) return alert('Faça login'); const v=Math.floor(users[currentUserId].balance*0.25); promptQuickBet(v); });
+      qs('#quick-50')?.addEventListener('click', ()=>{ if(!currentUserId) return alert('Faça login'); const v=Math.floor(users[currentUserId].balance*0.5); promptQuickBet(v); });
+      qs('#quick-100')?.addEventListener('click', ()=>{ if(!currentUserId) return alert('Faça login'); const v=Math.floor(users[currentUserId].balance); promptQuickBet(v); });
+      function promptQuickBet(val){ const s = prompt('Valor rápido (R$):', String(val)); if(!s) return; const v=Number(s); if(!v || v<=0) return alert('Valor inválido'); // store to clipboard to be convenient
+        navigator.clipboard?.writeText(String(v)).catch(()=>{}); showToast('Valor copiado — cole no campo de aposta'); }
+
+      // Auth
+      function registerOrLogin(name){
+        const trimmed = name.trim(); if(!trimmed) return;
+        const existingId = Object.keys(users).find(k=>users[k].name.toLowerCase()===trimmed.toLowerCase());
+        if(existingId){ currentUserId = existingId; saveCurrent(); render(); showToast('Bem-vindo de volta'); return; }
+        const id = uid(); users[id] = { id, name: trimmed, balance: STARTING_BALANCE, history: [] }; saveUsers(); currentUserId = id; saveCurrent(); render(); showToast('Conta criada — saldo inicial R$ 2.000.000');
+      }
+
+      loginBtn.addEventListener('click', ()=>{ const v = nameInput.value.trim(); if(v) registerOrLogin(v); });
+      document.addEventListener('keyup', (e)=>{ if(e.key==='Enter'){ const active = document.activeElement; if(active && active.id==='name-input') loginBtn.click(); } });
+      resetBtn.addEventListener('click', ()=>{ if(!currentUserId) return alert('Faça login'); if(confirm('Resetar saldo para 2kk?')){ users[currentUserId].balance = STARTING_BALANCE; saveUsers(); render(); showToast('Saldo resetado'); } });
+
+      // Admin login
+      adminLoginBtn.addEventListener('click', ()=>{
+        const pass = adminPassInput.value;
+        if(pass===ADMIN_PASS){ isAdmin=true; saveIsAdmin(); alert('Logado como admin.'); render(); } else { alert('Senha de admin incorreta.'); }
+      });
+
+      // Admin panel render
+      function renderAdminPanel(){
+        adminPanelPlaceholder.innerHTML = '';
+        if(!isAdmin) return;
+        const box = document.createElement('div'); box.className='card admin-box';
+        box.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:800">Painel Admin</div><div><button id="admin-logout" class="btn-orange">Logout Admin</button></div></div>
+          <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <input id="adm-teamA" placeholder="Time A" />
+            <input id="adm-teamB" placeholder="Time B" />
+            <input id="adm-kickoff" type="datetime-local" />
+            <input id="adm-oddA" placeholder="Odd A" />
+            <input id="adm-oddB" placeholder="Odd B" />
+            <div><button id="adm-add" class="btn-primary" style="width:100%">Adicionar Partida</button></div>
+          </div>
+          <div style="margin-top:12px"><div style="font-weight:700">Usuários</div><div class="users-list" id="users-list"></div></div>
+        `;
+        adminPanelPlaceholder.appendChild(box);
+
+        qs('#admin-logout').addEventListener('click', ()=>{ isAdmin=false; saveIsAdmin(); render(); });
+        qs('#adm-add').addEventListener('click', ()=>{
+          const teamA = qs('#adm-teamA').value.trim(); const teamB = qs('#adm-teamB').value.trim(); const oddA = parseFloat(qs('#adm-oddA').value); const oddB = parseFloat(qs('#adm-oddB').value); const kickoff = qs('#adm-kickoff').value? new Date(qs('#adm-kickoff').value).toISOString(): new Date().toISOString();
+          if(!teamA || !teamB || !oddA || !oddB) return alert('Preencha todos os campos');
+          matches.unshift({id:uid(),teamA,teamB,oddA,oddB,kickoff,status:'open',winner:null}); saveMatches(); render(); showToast('Partida adicionada');
+        });
+
+        const ul = qs('#users-list'); ul.innerHTML='';
+        Object.values(users).forEach(u=>{
+          const it = document.createElement('div'); it.className='user-item'; it.innerHTML = `<div><div style="font-weight:700">${u.name}</div><div style="font-size:12px;color:var(--muted)">R$ ${money(u.balance)}</div></div><div style="display:flex;gap:6px"><button data-credit="${u.id}" class="btn-orange">Creditar</button><button data-delete="${u.id}" class="btn-dark">Apagar</button></div>`;
+          ul.appendChild(it);
+        });
+
+        ul.querySelectorAll('button[data-credit]').forEach(b=>{
+          b.addEventListener('click', ()=>{ const id=b.getAttribute('data-credit'); const v = Number(prompt('Valor para creditar (ex: 100000):','100000'))||0; if(v){ users[id].balance+=v; saveUsers(); render(); showToast('Usuário creditado'); } });
+        });
+        ul.querySelectorAll('button[data-delete]').forEach(b=>{
+          b.addEventListener('click', ()=>{ const id=b.getAttribute('data-delete'); if(confirm('Remover usuário?')){ delete users[id]; saveUsers(); render(); showToast('Usuário removido'); } });
+        });
+      }
+
+      // Admin edit modal (better than prompt)
+      function openAdminEditModal(matchId){
+        const match = matches.find(m=>m.id===matchId); if(!match) return;
+        if(document.querySelector('.modal-bg')) return;
+        const modalBg = document.createElement('div'); modalBg.className='modal-bg';
+        const modal = document.createElement('div'); modal.className='modal';
+        modal.innerHTML = `
+          <h3>Editar Partida</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <input id="e-teamA" value="${match.teamA}" />
+            <input id="e-teamB" value="${match.teamB}" />
+            <input id="e-oddA" value="${match.oddA}" />
+            <input id="e-oddB" value="${match.oddB}" />
+            <input id="e-kickoff" type="datetime-local" />
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button id="e-save" class="btn-primary">Salvar</button><button id="e-cancel" class="btn-dark">Cancelar</button></div>
+        `;
+        modalBg.appendChild(modal); document.body.appendChild(modalBg);
+        // set kickoff to local value
+        try{ qs('#e-kickoff').value = new Date(match.kickoff).toISOString().slice(0,16); }catch(e){}
+        qs('#e-cancel').addEventListener('click', ()=>modalBg.remove());
+        qs('#e-save').addEventListener('click', ()=>{
+          const teamA = qs('#e-teamA').value.trim(); const teamB = qs('#e-teamB').value.trim(); const oddA = parseFloat(qs('#e-oddA').value); const oddB = parseFloat(qs('#e-oddB').value); const kickoff = qs('#e-kickoff').value? new Date(qs('#e-kickoff').value).toISOString():match.kickoff;
+          if(!teamA||!teamB||!oddA||!oddB) return alert('Preencha corretamente');
+          updateMatch(matchId,{teamA,teamB,oddA,oddB,kickoff}); modalBg.remove(); showToast('Partida atualizada');
+        });
+      }
+
+      // Match update/finish
+      function updateMatch(id, partial){ const m = matches.find(x=>x.id===id); if(!m) return; Object.assign(m, partial); saveMatches(); render(); }
+
+      function finishMatch(id, winner){
+        const m = matches.find(x=>x.id===id); if(!m) return; m.status='finished'; m.winner = winner; saveMatches();
+        // process bets
+        const affected = bets.filter(b=>b.matchId===id && b.status==='pending');
+        affected.forEach(b=>{
+          const user = users[b.userId]; if(!user) return;
+          const won = b.outcome === winner;
+          const payout = won ? Math.floor(b.amount * b.odd) : 0;
+          // update user
+          user.history = (user.history||[]).map(h=> h.id===b.id ? {...h,status: won? 'won':'lost', payout}: h);
+          if(won) user.balance += payout; saveUsers();
+          // update global bet
+          bets = bets.map(x=> x.id===b.id ? {...x, status: won? 'won':'lost', payout}: x);
+        });
+        saveBets(); render(); alert('Partida finalizada. Confira histórico e saldos.');
+      }
+
+      // sort select
+      sortSelect.addEventListener('change', ()=>render());
+
+      // Initial render
+      render();
+
+      // Expose some utils to console (debug)
+      window._bet = {users, matches, bets, saveUsers, saveMatches, saveBets};
+
+    })();
+  </script>
+</body>
+</html>
 
