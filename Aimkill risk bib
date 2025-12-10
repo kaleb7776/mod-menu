@@ -1,0 +1,642 @@
+-- AdvAim Head-Focused Auto-Fire (prioriza head sempre que visível; atira mesmo sem alinhamento fino)
+-- Coloque este script em StarterPlayerScripts como LocalScript
+-- AVISO: usar cheats pode resultar em ban. Use apenas em servidores de teste/local.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+
+-- =========================
+-- CONFIG (ajustável)
+-- =========================
+local CONFIG = {
+    SCREEN_RADIUS = 120,   -- raio em pixels para seleção de alvo (maior pega mais alvos na tela)
+    MAX_DIST = 300,        -- distância máxima (studs)
+    WALL_CHECK = true,     -- verificar paredes antes de enviar hit
+    FRIEND_CHECK = false,  -- ignorar friends
+    REQUIRED_SHOTS = 2,    -- quantos tiros no peito antes de mandar head (se ALWAYS_HEAD=false)
+    AUTO_MODE = true,      -- atira automaticamente sem esperar WeaponFired
+    FIRE_COOLDOWN = 0.05,  -- tempo mínimo entre tentativas de envio por alvo (global)
+    IGNORE_USERNAMES = {   -- lowercase keys
+        ["banido3px"] = true
+    },
+    ALWAYS_HEAD = true,    -- se true, tenta head sempre que visível (prioridade máxima)
+    ALLOW_HEAD_THROUGH_GLASS = false -- se true, permitirá head mesmo que material transparente (ex.: vidro)
+}
+
+-- estado
+local lastGlobalFire = 0
+local shotCounters = {} -- shotCounters[userId] = número de tiros no peito acumulados
+
+-- ==========
+-- REMOTES
+-- ==========
+local WeaponFired, WeaponHit
+do
+    local ok, ws = pcall(function() return ReplicatedStorage:FindFirstChild("WeaponsSystem") end)
+    if ok and ws then
+        local net = ws:FindFirstChild("Network")
+        if net then
+            WeaponFired = net:FindFirstChild("WeaponFired")
+            WeaponHit = net:FindFirstChild("WeaponHit")
+        end
+    end
+    -- fallback buscar WeaponHit direto
+    if not WeaponHit then
+        WeaponHit = ReplicatedStorage:FindFirstChild("WeaponHit") or workspace:FindFirstChild("WeaponHit")
+    end
+end
+
+-- ==========
+-- UTILITÁRIOS
+-- ==========
+local function isNameIgnored(player)
+    if not player or not player.Name then return false end
+    return CONFIG.IGNORE_USERNAMES[string.lower(player.Name)] == true
+end
+
+local function isFriendSafe(player)
+    if isNameIgnored(player) then return true end
+    if not CONFIG.FRIEND_CHECK then return false end
+    if not LocalPlayer then return false end
+    local ok, res = pcall(function() return LocalPlayer:IsFriendsWith(player.UserId) end)
+    return ok and res
+end
+
+local function getChestPart(character)
+    if not character then return nil end
+    return character:FindFirstChild("HumanoidRootPart")
+        or character:FindFirstChild("UpperTorso")
+        or character:FindFirstChild("Torso")
+end
+
+local function raycastHit(orig, dest, blacklist)
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = blacklist or {}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.IgnoreWater = true
+    local ok, res = pcall(function() return workspace:Raycast(orig, dest - orig, params) end)
+    if not ok then return nil end
+    return res
+end
+
+local function hasWallBetween(orig, dest)
+    if not CONFIG.WALL_CHECK then return false end
+    if not orig or not dest then return false end
+    local res = raycastHit(orig, dest, {LocalPlayer.Character})
+    if not res then return false end
+    -- if ray hit a part belonging to any player's character, treat as no wall
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p.Character and res.Instance and res.Instance:IsDescendantOf(p.Character) then
+            return false
+        end
+    end
+    return true
+end
+
+local function isPartVisible(orig, part)
+    if not part then return false end
+    local res = raycastHit(orig, part.Position, {LocalPlayer.Character})
+    if not res then
+        return true
+    end
+    if res.Instance and res.Instance:IsDescendantOf(part.Parent) then
+        return true
+    end
+    -- allow head through glass if configured
+    if CONFIG.ALLOW_HEAD_THROUGH_GLASS and res.Instance and res.Instance.Material == Enum.Material.Glass then
+        -- consider glass as not blocking when ALLOW_HEAD_THROUGH_GLASS=true
+        return true
+    end
+    return false
+end
+
+local function sendHitSafe(arma, targetPart, position)
+    if not WeaponHit or typeof(WeaponHit.FireServer) ~= "function" then return end
+    if not arma or not targetPart or not position then return end
+    local args = {
+        arma,
+        {
+            p = position,
+            pid = 1,
+            part = targetPart,
+            d = 0,
+            maxDist = CONFIG.MAX_DIST,
+            h = targetPart,
+            m = targetPart.Material or Enum.Material.Plastic,
+            n = Vector3.new(0,1,0),
+            t = 0.5,
+            sid = 1
+        },
+        true
+    }
+    pcall(function() WeaponHit:FireServer(unpack(args)) end)
+end
+
+-- ==========
+-- SELEÇÃO DE ALVO (focado em head)
+-- ==========
+local function getBestTarget()
+    if not Camera or not LocalPlayer then return nil end
+    local fromPos = Camera.CFrame.Position
+    local viewport = Camera.ViewportSize
+    local screenCenter = Vector2.new(viewport.X/2, viewport.Y/2)
+
+    local bestPlayer = nil
+    local bestScore = math.huge
+
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character.Parent then
+            if isFriendSafe(p) then
+                shotCounters[p.UserId] = 0
+            else
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    local head = p.Character:FindFirstChild("Head")
+                    local chest = getChestPart(p.Character)
+                    -- decide target part to evaluate for screen position (prefer head for scoring)
+                    local evalPart = head or chest
+                    if evalPart then
+                        local dist3 = (evalPart.Position - fromPos).Magnitude
+                        if dist3 <= CONFIG.MAX_DIST then
+                            local screenPos, onScreen = Camera:WorldToViewportPoint(evalPart.Position)
+                            if onScreen then
+                                local dx = screenPos.X - screenCenter.X
+                                local dy = screenPos.Y - screenCenter.Y
+                                local dist2 = math.sqrt(dx*dx + dy*dy)
+                                -- scoring: prioriza centralidade e proximidade
+                                local score = dist2 + (dist3 / 10)
+                                if score < bestScore and dist2 <= CONFIG.SCREEN_RADIUS then
+                                    -- quick visibility check for head first (if head exists)
+                                    local visible = false
+                                    if head and isPartVisible(fromPos, head) then
+                                        visible = true
+                                    elseif chest and isPartVisible(fromPos, chest) then
+                                        visible = true
+                                    end
+                                    if visible then
+                                        bestScore = score
+                                        bestPlayer = p
+                                    end
+                                end
+                            end
+                        end
+                    end
+                else
+                    shotCounters[p.UserId] = 0
+                end
+            end
+        end
+    end
+    return bestPlayer
+end
+
+-- ==========
+-- LÓGICA DE DISPARO: sempre tenta head se CONFIG.ALWAYS_HEAD=true e head visível
+-- ==========
+local function attemptShootAt(player)
+    if not player or not player.Character then return end
+    local uid = player.UserId
+    local head = player.Character:FindFirstChild("Head")
+    local chest = getChestPart(player.Character)
+    if not head and not chest then return end
+
+    shotCounters[uid] = shotCounters[uid] or 0
+
+    local now = tick()
+    if now - lastGlobalFire < CONFIG.FIRE_COOLDOWN then return end
+
+    local targetPart = chest
+    -- if ALWAYS_HEAD: try head whenever visible
+    if CONFIG.ALWAYS_HEAD and head and isPartVisible(Camera.CFrame.Position, head) then
+        targetPart = head
+    else
+        -- fallback original behavior: chest until REQUIRED_SHOTS then head
+        if shotCounters[uid] >= CONFIG.REQUIRED_SHOTS and head and isPartVisible(Camera.CFrame.Position, head) then
+            targetPart = head
+        else
+            targetPart = chest
+        end
+    end
+
+    if not targetPart then return end
+
+    -- wall check on chosen part
+    if CONFIG.WALL_CHECK and hasWallBetween(Camera.CFrame.Position, targetPart.Position) then
+        return
+    end
+
+    -- get weapon object if available
+    local tool = LocalPlayer and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+    local armaParam = tool or (tool and tool.Name) or "UnknownTool"
+
+    -- envia hit
+    sendHitSafe(armaParam, targetPart, targetPart.Position)
+    lastGlobalFire = now
+
+    -- atualizar contador
+    if targetPart == chest then
+        shotCounters[uid] = (shotCounters[uid] or 0) + 1
+    else
+        shotCounters[uid] = 0
+    end
+end
+
+-- ==========
+-- GERENCIAMENTO JOGADORES
+-- ==========
+local deathConns = {}
+Players.PlayerAdded:Connect(function(p)
+    shotCounters[p.UserId] = 0
+end)
+Players.PlayerRemoving:Connect(function(p)
+    shotCounters[p.UserId] = nil
+    if deathConns[p.UserId] then
+        pcall(function() deathConns[p.UserId]:Disconnect() end)
+        deathConns[p.UserId] = nil
+    end
+end)
+for _,p in ipairs(Players:GetPlayers()) do
+    shotCounters[p.UserId] = 0
+end
+
+local function bindDeath(player)
+    if not player or not player.Character then return end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    if deathConns[player.UserId] then
+        pcall(function() deathConns[player.UserId]:Disconnect() end)
+    end
+    deathConns[player.UserId] = hum.Died:Connect(function()
+        shotCounters[player.UserId] = 0
+    end)
+end
+Players.PlayerAdded:Connect(bindDeath)
+for _,p in ipairs(Players:GetPlayers()) do bindDeath(p) end
+
+-- ==========
+-- MODO: responder a WeaponFired (opcional) OU auto-mode contínuo
+-- ==========
+if WeaponFired and typeof(WeaponFired.OnClientEvent) == "Instance" then
+    WeaponFired.OnClientEvent:Connect(function()
+        local alvo = getBestTarget()
+        if alvo then
+            attemptShootAt(alvo)
+        end
+    end)
+end
+
+if CONFIG.AUTO_MODE then
+    RunService.Heartbeat:Connect(function()
+        if not LocalPlayer or not LocalPlayer.Character then return end
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return end
+        local alvo = getBestTarget()
+        if alvo then
+            attemptShootAt(alvo)
+        end
+    end)
+end
+
+-- API runtime
+_G.AdvAim = _G.AdvAim or {}
+_G.AdvAim.SetScreenRadius = function(v) if tonumber(v) then CONFIG.SCREEN_RADIUS = tonumber(v) end end
+_G.AdvAim.SetMaxDist = function(v) if tonumber(v) then CONFIG.MAX_DIST = tonumber(v) end end
+_G.AdvAim.SetWallCheck = function(v) CONFIG.WALL_CHECK = (v == true) end
+_G.AdvAim.SetFriendCheck = function(v) CONFIG.FRIEND_CHECK = (v == true) end
+_G.AdvAim.SetRequiredShots = function(v) if tonumber(v) then CONFIG.REQUIRED_SHOTS = math.max(0, math.floor(tonumber(v))) end end
+_G.AdvAim.SetAlwaysHead = function(v) CONFIG.ALWAYS_HEAD = (v == true) end
+_G.AdvAim.SetFireCooldown = function(v) if tonumber(v) then CONFIG.FIRE_COOLDOWN = tonumber(v) end end
+_G.AdvAim.AddIgnore = function(name) if type(name) == "string" and name ~= "" then CONFIG.IGNORE_USERNAMES[string.lower(name)] = true end end
+_G.AdvAim.RemoveIgnore = function(name) if type(name) == "string" and name ~= "" then CONFIG.IGNORE_USERNAMES[string.lower(name)] = nil end end
+_G.AdvAim.ListIgnored = function()
+    local out = {}
+    for k,v in pairs(CONFIG.IGNORE_USERNAMES) do if v then table.insert(out, k) end end
+    return out
+end
+
+print("[AdvAim-Head] carregado. ALWAYS_HEAD:", CONFIG.ALWAYS_HEAD, "FIRE_COOLDOWN:", CONFIG.FIRE_COOLDOWN, "REQUIRED_SHOTS:", CONFIG.REQUIRED_SHOTS)
+-- AdvAim Head-Focused Auto-Fire (prioriza head sempre que visível; atira mesmo sem alinhamento fino)
+-- Coloque este script em StarterPlayerScripts como LocalScript
+-- AVISO: usar cheats pode resultar em ban. Use apenas em servidores de teste/local.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+
+-- =========================
+-- CONFIG (ajustável)
+-- =========================
+local CONFIG = {
+    SCREEN_RADIUS = 120,   -- raio em pixels para seleção de alvo (maior pega mais alvos na tela)
+    MAX_DIST = 300,        -- distância máxima (studs)
+    WALL_CHECK = true,     -- verificar paredes antes de enviar hit
+    FRIEND_CHECK = false,  -- ignorar friends
+    REQUIRED_SHOTS = 2,    -- quantos tiros no peito antes de mandar head (se ALWAYS_HEAD=false)
+    AUTO_MODE = true,      -- atira automaticamente sem esperar WeaponFired
+    FIRE_COOLDOWN = 0.05,  -- tempo mínimo entre tentativas de envio por alvo (global)
+    IGNORE_USERNAMES = {   -- lowercase keys
+        ["banido3px"] = true
+    },
+    ALWAYS_HEAD = true,    -- se true, tenta head sempre que visível (prioridade máxima)
+    ALLOW_HEAD_THROUGH_GLASS = false -- se true, permitirá head mesmo que material transparente (ex.: vidro)
+}
+
+-- estado
+local lastGlobalFire = 0
+local shotCounters = {} -- shotCounters[userId] = número de tiros no peito acumulados
+
+-- ==========
+-- REMOTES
+-- ==========
+local WeaponFired, WeaponHit
+do
+    local ok, ws = pcall(function() return ReplicatedStorage:FindFirstChild("WeaponsSystem") end)
+    if ok and ws then
+        local net = ws:FindFirstChild("Network")
+        if net then
+            WeaponFired = net:FindFirstChild("WeaponFired")
+            WeaponHit = net:FindFirstChild("WeaponHit")
+        end
+    end
+    -- fallback buscar WeaponHit direto
+    if not WeaponHit then
+        WeaponHit = ReplicatedStorage:FindFirstChild("WeaponHit") or workspace:FindFirstChild("WeaponHit")
+    end
+end
+
+-- ==========
+-- UTILITÁRIOS
+-- ==========
+local function isNameIgnored(player)
+    if not player or not player.Name then return false end
+    return CONFIG.IGNORE_USERNAMES[string.lower(player.Name)] == true
+end
+
+local function isFriendSafe(player)
+    if isNameIgnored(player) then return true end
+    if not CONFIG.FRIEND_CHECK then return false end
+    if not LocalPlayer then return false end
+    local ok, res = pcall(function() return LocalPlayer:IsFriendsWith(player.UserId) end)
+    return ok and res
+end
+
+local function getChestPart(character)
+    if not character then return nil end
+    return character:FindFirstChild("HumanoidRootPart")
+        or character:FindFirstChild("UpperTorso")
+        or character:FindFirstChild("Torso")
+end
+
+local function raycastHit(orig, dest, blacklist)
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = blacklist or {}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.IgnoreWater = true
+    local ok, res = pcall(function() return workspace:Raycast(orig, dest - orig, params) end)
+    if not ok then return nil end
+    return res
+end
+
+local function hasWallBetween(orig, dest)
+    if not CONFIG.WALL_CHECK then return false end
+    if not orig or not dest then return false end
+    local res = raycastHit(orig, dest, {LocalPlayer.Character})
+    if not res then return false end
+    -- if ray hit a part belonging to any player's character, treat as no wall
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p.Character and res.Instance and res.Instance:IsDescendantOf(p.Character) then
+            return false
+        end
+    end
+    return true
+end
+
+local function isPartVisible(orig, part)
+    if not part then return false end
+    local res = raycastHit(orig, part.Position, {LocalPlayer.Character})
+    if not res then
+        return true
+    end
+    if res.Instance and res.Instance:IsDescendantOf(part.Parent) then
+        return true
+    end
+    -- allow head through glass if configured
+    if CONFIG.ALLOW_HEAD_THROUGH_GLASS and res.Instance and res.Instance.Material == Enum.Material.Glass then
+        -- consider glass as not blocking when ALLOW_HEAD_THROUGH_GLASS=true
+        return true
+    end
+    return false
+end
+
+local function sendHitSafe(arma, targetPart, position)
+    if not WeaponHit or typeof(WeaponHit.FireServer) ~= "function" then return end
+    if not arma or not targetPart or not position then return end
+    local args = {
+        arma,
+        {
+            p = position,
+            pid = 1,
+            part = targetPart,
+            d = 0,
+            maxDist = CONFIG.MAX_DIST,
+            h = targetPart,
+            m = targetPart.Material or Enum.Material.Plastic,
+            n = Vector3.new(0,1,0),
+            t = 0.5,
+            sid = 1
+        },
+        true
+    }
+    pcall(function() WeaponHit:FireServer(unpack(args)) end)
+end
+
+-- ==========
+-- SELEÇÃO DE ALVO (focado em head)
+-- ==========
+local function getBestTarget()
+    if not Camera or not LocalPlayer then return nil end
+    local fromPos = Camera.CFrame.Position
+    local viewport = Camera.ViewportSize
+    local screenCenter = Vector2.new(viewport.X/2, viewport.Y/2)
+
+    local bestPlayer = nil
+    local bestScore = math.huge
+
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character.Parent then
+            if isFriendSafe(p) then
+                shotCounters[p.UserId] = 0
+            else
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    local head = p.Character:FindFirstChild("Head")
+                    local chest = getChestPart(p.Character)
+                    -- decide target part to evaluate for screen position (prefer head for scoring)
+                    local evalPart = head or chest
+                    if evalPart then
+                        local dist3 = (evalPart.Position - fromPos).Magnitude
+                        if dist3 <= CONFIG.MAX_DIST then
+                            local screenPos, onScreen = Camera:WorldToViewportPoint(evalPart.Position)
+                            if onScreen then
+                                local dx = screenPos.X - screenCenter.X
+                                local dy = screenPos.Y - screenCenter.Y
+                                local dist2 = math.sqrt(dx*dx + dy*dy)
+                                -- scoring: prioriza centralidade e proximidade
+                                local score = dist2 + (dist3 / 10)
+                                if score < bestScore and dist2 <= CONFIG.SCREEN_RADIUS then
+                                    -- quick visibility check for head first (if head exists)
+                                    local visible = false
+                                    if head and isPartVisible(fromPos, head) then
+                                        visible = true
+                                    elseif chest and isPartVisible(fromPos, chest) then
+                                        visible = true
+                                    end
+                                    if visible then
+                                        bestScore = score
+                                        bestPlayer = p
+                                    end
+                                end
+                            end
+                        end
+                    end
+                else
+                    shotCounters[p.UserId] = 0
+                end
+            end
+        end
+    end
+    return bestPlayer
+end
+
+-- ==========
+-- LÓGICA DE DISPARO: sempre tenta head se CONFIG.ALWAYS_HEAD=true e head visível
+-- ==========
+local function attemptShootAt(player)
+    if not player or not player.Character then return end
+    local uid = player.UserId
+    local head = player.Character:FindFirstChild("Head")
+    local chest = getChestPart(player.Character)
+    if not head and not chest then return end
+
+    shotCounters[uid] = shotCounters[uid] or 0
+
+    local now = tick()
+    if now - lastGlobalFire < CONFIG.FIRE_COOLDOWN then return end
+
+    local targetPart = chest
+    -- if ALWAYS_HEAD: try head whenever visible
+    if CONFIG.ALWAYS_HEAD and head and isPartVisible(Camera.CFrame.Position, head) then
+        targetPart = head
+    else
+        -- fallback original behavior: chest until REQUIRED_SHOTS then head
+        if shotCounters[uid] >= CONFIG.REQUIRED_SHOTS and head and isPartVisible(Camera.CFrame.Position, head) then
+            targetPart = head
+        else
+            targetPart = chest
+        end
+    end
+
+    if not targetPart then return end
+
+    -- wall check on chosen part
+    if CONFIG.WALL_CHECK and hasWallBetween(Camera.CFrame.Position, targetPart.Position) then
+        return
+    end
+
+    -- get weapon object if available
+    local tool = LocalPlayer and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+    local armaParam = tool or (tool and tool.Name) or "UnknownTool"
+
+    -- envia hit
+    sendHitSafe(armaParam, targetPart, targetPart.Position)
+    lastGlobalFire = now
+
+    -- atualizar contador
+    if targetPart == chest then
+        shotCounters[uid] = (shotCounters[uid] or 0) + 1
+    else
+        shotCounters[uid] = 0
+    end
+end
+
+-- ==========
+-- GERENCIAMENTO JOGADORES
+-- ==========
+local deathConns = {}
+Players.PlayerAdded:Connect(function(p)
+    shotCounters[p.UserId] = 0
+end)
+Players.PlayerRemoving:Connect(function(p)
+    shotCounters[p.UserId] = nil
+    if deathConns[p.UserId] then
+        pcall(function() deathConns[p.UserId]:Disconnect() end)
+        deathConns[p.UserId] = nil
+    end
+end)
+for _,p in ipairs(Players:GetPlayers()) do
+    shotCounters[p.UserId] = 0
+end
+
+local function bindDeath(player)
+    if not player or not player.Character then return end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    if deathConns[player.UserId] then
+        pcall(function() deathConns[player.UserId]:Disconnect() end)
+    end
+    deathConns[player.UserId] = hum.Died:Connect(function()
+        shotCounters[player.UserId] = 0
+    end)
+end
+Players.PlayerAdded:Connect(bindDeath)
+for _,p in ipairs(Players:GetPlayers()) do bindDeath(p) end
+
+-- ==========
+-- MODO: responder a WeaponFired (opcional) OU auto-mode contínuo
+-- ==========
+if WeaponFired and typeof(WeaponFired.OnClientEvent) == "Instance" then
+    WeaponFired.OnClientEvent:Connect(function()
+        local alvo = getBestTarget()
+        if alvo then
+            attemptShootAt(alvo)
+        end
+    end)
+end
+
+if CONFIG.AUTO_MODE then
+    RunService.Heartbeat:Connect(function()
+        if not LocalPlayer or not LocalPlayer.Character then return end
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return end
+        local alvo = getBestTarget()
+        if alvo then
+            attemptShootAt(alvo)
+        end
+    end)
+end
+
+-- API runtime
+_G.AdvAim = _G.AdvAim or {}
+_G.AdvAim.SetScreenRadius = function(v) if tonumber(v) then CONFIG.SCREEN_RADIUS = tonumber(v) end end
+_G.AdvAim.SetMaxDist = function(v) if tonumber(v) then CONFIG.MAX_DIST = tonumber(v) end end
+_G.AdvAim.SetWallCheck = function(v) CONFIG.WALL_CHECK = (v == true) end
+_G.AdvAim.SetFriendCheck = function(v) CONFIG.FRIEND_CHECK = (v == true) end
+_G.AdvAim.SetRequiredShots = function(v) if tonumber(v) then CONFIG.REQUIRED_SHOTS = math.max(0, math.floor(tonumber(v))) end end
+_G.AdvAim.SetAlwaysHead = function(v) CONFIG.ALWAYS_HEAD = (v == true) end
+_G.AdvAim.SetFireCooldown = function(v) if tonumber(v) then CONFIG.FIRE_COOLDOWN = tonumber(v) end end
+_G.AdvAim.AddIgnore = function(name) if type(name) == "string" and name ~= "" then CONFIG.IGNORE_USERNAMES[string.lower(name)] = true end end
+_G.AdvAim.RemoveIgnore = function(name) if type(name) == "string" and name ~= "" then CONFIG.IGNORE_USERNAMES[string.lower(name)] = nil end end
+_G.AdvAim.ListIgnored = function()
+    local out = {}
+    for k,v in pairs(CONFIG.IGNORE_USERNAMES) do if v then table.insert(out, k) end end
+    return out
+end
+
+print("[AdvAim-Head] carregado. ALWAYS_HEAD:", CONFIG.ALWAYS_HEAD, "FIRE_COOLDOWN:", CONFIG.FIRE_COOLDOWN, "REQUIRED_SHOTS:", CONFIG.REQUIRED_SHOTS)
