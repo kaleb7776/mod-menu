@@ -1,0 +1,1131 @@
+-- Master Menu (Zov UI) + Ultra Clean ZOV (ESP/Visuals) + AdvAim (Risco) + Sequestro
+-- Single LocalScript -> StarterPlayerScripts
+-- Requisitos: executor com Drawing.new (opcional), Highlight para chams; Zov UI library será carregada pela net.
+-- AVISO: usar cheats pode resultar em ban. Use apenas em servidores de teste/local.
+
+-- ===== Services =====
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local ChatServiceTransfer = nil
+pcall(function() ChatServiceTransfer = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") end)
+
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- watch camera swaps (robustness)
+pcall(function()
+    Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+        Camera = Workspace.CurrentCamera
+    end)
+end)
+
+-- ===== Load Zov UI Library =====
+local okLib, Library = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/egor2078f/Zov-UI/refs/heads/main/zov.lua"))()
+end)
+if not okLib or not Library then
+    warn("Falha ao carregar Zov UI library.")
+    Library = nil
+end
+
+-- ===== Helpers =====
+local function safeNotify(title, text, dur)
+    if Library and Library.Notify then pcall(function() Library:Notify(title, text, dur or 2) end) else
+        pcall(function() print(("NOTIFY — %s: %s"):format(title,tostring(text))) end)
+    end
+end
+
+local function safeFireSayMessage(msg)
+    -- uses Chat remote used by many Roblox games
+    pcall(function()
+        if ChatServiceTransfer and ChatServiceTransfer:FindFirstChild("SayMessageRequest") then
+            ChatServiceTransfer.SayMessageRequest:FireServer(msg, "All")
+            return true
+        end
+        -- fallback older API
+        local chat = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+        if chat and chat:FindFirstChild("SayMessageRequest") then
+            chat.SayMessageRequest:FireServer(msg, "All")
+            return true
+        end
+    end)
+    return false
+end
+
+-- Quick find player (partial name)
+local function findPlayerByPartial(name)
+    if not name or name == "" then return nil end
+    local low = name:lower()
+    for _,p in pairs(Players:GetPlayers()) do
+        if p.Name:lower():find(low) then return p end
+        if p.DisplayName and p.DisplayName:lower():find(low) then return p end
+    end
+    return nil
+end
+
+-- ===== ZOV Ultra Clean module (ESP & visuals) =====
+_G.ZOV = _G.ZOV or {}
+local ZOV = _G.ZOV
+
+ZOV.settings = ZOV.settings or {
+    Enabled = false,
+    Box = true,
+    Name = true,
+    Tool = true,
+    Health = true,
+    Skeleton = true,
+    Tracer = false,
+    Chams = false,
+    Mode = "Box",
+    Color = Color3.fromRGB(30,144,255),
+    MaxDistance = 300,
+    DrawingAvailable = true
+}
+local S = ZOV.settings
+
+ZOV._esps = ZOV._esps or {}
+ZOV._bones = ZOV._bones or {
+    {"Head","UpperTorso"}, {"UpperTorso","LowerTorso"},
+    {"UpperTorso","LeftUpperArm"}, {"LeftUpperArm","LeftLowerArm"},
+    {"UpperTorso","RightUpperArm"}, {"RightUpperArm","RightLowerArm"},
+    {"LowerTorso","LeftUpperLeg"}, {"LeftUpperLeg","LeftLowerLeg"},
+    {"LowerTorso","RightUpperLeg"}, {"RightUpperLeg","RightLowerLeg"},
+}
+
+local function safe(fn, ...) local ok,res = pcall(fn, ...) if ok then return res end return nil end
+
+-- Drawing availability check
+local okDraw = pcall(function() return Drawing and typeof(Drawing.new) == "function" end)
+if not okDraw then S.DrawingAvailable = false end
+
+function ZOV.NewDrawing(typeName, props)
+    if not S.DrawingAvailable then return nil end
+    local ok, obj = pcall(function() return Drawing.new(typeName) end)
+    if not ok or not obj then S.DrawingAvailable = false; return nil end
+    for k,v in pairs(props or {}) do pcall(function() obj[k] = v end) end
+    return obj
+end
+
+function ZOV.CreateDrawings()
+    local d = {}
+    d.box = ZOV.NewDrawing("Square", {Visible=false, Thickness=1, Filled=false, Color=S.Color})
+    d.nameTag = ZOV.NewDrawing("Text", {Visible=false, Size=12, Center=true, Outline=false, Font=2, Color=Color3.fromRGB(230,230,230)})
+    d.toolTag = ZOV.NewDrawing("Text", {Visible=false, Size=12, Center=true, Outline=false, Font=2, Color=Color3.fromRGB(150,200,255)})
+    d.healthLine = ZOV.NewDrawing("Line", {Visible=false, Thickness=2, Color=Color3.fromRGB(255,255,0)})
+    d.tracer = ZOV.NewDrawing("Line", {Visible=false, Thickness=1, Color=S.Color})
+    d.skeleton = {}
+    for i=1,#ZOV._bones do d.skeleton[i] = ZOV.NewDrawing("Line", {Visible=false, Color=S.Color, Thickness=1}) end
+    return d
+end
+
+function ZOV.HideAll(drawings)
+    if not drawings then return end
+    pcall(function()
+        if drawings.box then drawings.box.Visible = false end
+        if drawings.nameTag then drawings.nameTag.Visible = false end
+        if drawings.toolTag then drawings.toolTag.Visible = false end
+        if drawings.healthLine then drawings.healthLine.Visible = false end
+        if drawings.tracer then drawings.tracer.Visible = false end
+        if drawings.skeleton then for _,l in ipairs(drawings.skeleton) do l.Visible = false end end
+    end)
+end
+
+function ZOV.CleanupDrawings(drawings)
+    if not drawings then return end
+    pcall(function()
+        if drawings.box then drawings.box:Remove() end
+        if drawings.nameTag then drawings.nameTag:Remove() end
+        if drawings.toolTag then drawings.toolTag:Remove() end
+        if drawings.healthLine then drawings.healthLine:Remove() end
+        if drawings.tracer then drawings.tracer:Remove() end
+        if drawings.skeleton then for _,l in ipairs(drawings.skeleton) do if l then l:Remove() end end end
+    end)
+end
+
+local function IsOccluded(originPos, targetPos, targetChar)
+    if not originPos or not targetPos then return false end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = { targetChar }
+    if LocalPlayer.Character then table.insert(params.FilterDescendantsInstances, LocalPlayer.Character) end
+    params.IgnoreWater = true
+    local dir = targetPos - originPos
+    local ok, result = pcall(function() return Workspace:Raycast(originPos, dir, params) end)
+    if not ok then return false end
+    if result and result.Instance then
+        local distHit = (result.Position - originPos).Magnitude
+        if distHit < dir.Magnitude - 0.5 then return true end
+    end
+    return false
+end
+
+local function EnsureHighlight(esp)
+    if not esp then return end
+    if esp.hl and esp.hl.Parent then return end
+    local ok, hl = pcall(function() return Instance.new("Highlight") end)
+    if not ok or not hl then return end
+    hl.Name = "ZOV_Highlight_" .. (esp.player and esp.player.Name or "unknown")
+    hl.Parent = Workspace
+    hl.Enabled = false
+    hl.FillTransparency = 0.55
+    hl.OutlineTransparency = 1
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    esp.hl = hl
+end
+
+local function UpdateHighlight(esp, char, green)
+    if not S.Chams then
+        if esp and esp.hl then pcall(function() esp.hl.Enabled = false end) end
+        return
+    end
+    if not esp then return end
+    if not esp.hl then EnsureHighlight(esp) end
+    if not esp.hl then return end
+    local hl = esp.hl
+    if char and char:IsA("Model") then
+        pcall(function()
+            hl.Adornee = char
+            hl.Enabled = true
+            if green then
+                hl.FillColor = S.Color
+                hl.OutlineColor = Color3.new(math.clamp(S.Color.R*0.7,0,1), math.clamp(S.Color.G*0.7,0,1), math.clamp(S.Color.B*0.7,0,1))
+            else
+                hl.FillColor = Color3.fromRGB(255,40,40)
+                hl.OutlineColor = Color3.fromRGB(160,20,20)
+            end
+        end)
+    else
+        pcall(function() hl.Enabled = false; hl.Adornee = nil end)
+    end
+end
+
+function ZOV.UpdateESPFor(player, esp)
+    if not player or not esp or not esp.drawings then return end
+    local char = player.Character
+    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum or hum.Health <= 0 then ZOV.HideAll(esp.drawings); UpdateHighlight(esp, nil, false); return end
+
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local dist = myHRP and (hrp.Position - myHRP.Position).Magnitude or math.huge
+    if dist > S.MaxDistance then ZOV.HideAll(esp.drawings); UpdateHighlight(esp, nil, false); return end
+
+    local okVec, vec = pcall(function() return Camera:WorldToViewportPoint(hrp.Position) end)
+    if not okVec or not vec then ZOV.HideAll(esp.drawings); UpdateHighlight(esp, nil, false); return end
+    local onScreen = vec.Z > 0 and vec.X>=0 and vec.X<=Camera.ViewportSize.X and vec.Y>=0 and vec.Y<=Camera.ViewportSize.Y
+
+    local okH, headV = pcall(function() return Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0,3,0)) end)
+    local okF, footV = pcall(function() return Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0)) end)
+    local head = okH and headV or vec
+    local foot = okF and footV or vec
+    local height = math.abs(head.Y - foot.Y)
+    local width = math.max(1, height/2)
+    local x = vec.X - width/2
+    local y = head.Y
+
+    local origin = Camera and Camera.CFrame and Camera.CFrame.Position or nil
+    local targetPos = hrp.Position
+    local occluded = false
+    if origin and targetPos then occluded = IsOccluded(origin, targetPos, char) end
+    local visibleGreen = onScreen and (not occluded)
+
+    if S.Chams then EnsureHighlight(esp); UpdateHighlight(esp, char, visibleGreen) end
+
+    if S.Box and esp.drawings.box then
+        pcall(function()
+            esp.drawings.box.Size = Vector2.new(width, height)
+            esp.drawings.box.Position = Vector2.new(x, y)
+            esp.drawings.box.Visible = (S.Mode == "Box" or S.Mode == "Chams" or S.Mode == "Tracer" or S.Box)
+            esp.drawings.box.Color = (visibleGreen and S.Color) or (occluded and Color3.fromRGB(255,0,0) or Color3.fromRGB(255,120,120))
+        end)
+    end
+
+    if S.Name and esp.drawings.nameTag then
+        pcall(function()
+            esp.drawings.nameTag.Text = player.Name .. " ["..math.floor(dist).."m]"
+            esp.drawings.nameTag.Position = Vector2.new(vec.X, y - 14)
+            esp.drawings.nameTag.Visible = true
+            esp.drawings.nameTag.Color = (visibleGreen and S.Color) or (occluded and Color3.fromRGB(255,0,0) or Color3.fromRGB(255,200,200))
+        end)
+    end
+
+    if S.Tool and esp.drawings.toolTag and char then
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then
+            pcall(function()
+                esp.drawings.toolTag.Text = "["..tool.Name.."]"
+                esp.drawings.toolTag.Position = Vector2.new(vec.X, y + height + 5)
+                esp.drawings.toolTag.Visible = true
+            end)
+        else
+            esp.drawings.toolTag.Visible = false
+        end
+    end
+
+    if S.Health and esp.drawings.healthLine and hum then
+        pcall(function()
+            local hp = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+            esp.drawings.healthLine.From = Vector2.new(x - 4, y + height)
+            esp.drawings.healthLine.To = Vector2.new(x - 4, y + height * (1 - hp))
+            esp.drawings.healthLine.Color = Color3.fromRGB(math.floor(255 - 255*hp), math.floor(255*hp), 0)
+            esp.drawings.healthLine.Visible = true
+        end)
+    end
+
+    if S.Skeleton and esp.drawings.skeleton and char then
+        for i,bone in ipairs(ZOV._bones) do
+            local p1, p2 = bone[1], bone[2]; local line = esp.drawings.skeleton[i]
+            if char:FindFirstChild(p1) and char:FindFirstChild(p2) then
+                local ok1, p1v = pcall(function() return Camera:WorldToViewportPoint(char[p1].Position) end)
+                local ok2, p2v = pcall(function() return Camera:WorldToViewportPoint(char[p2].Position) end)
+                if ok1 and ok2 and p1v and p2v and p1v.Z>0 and p2v.Z>0 then
+                    pcall(function()
+                        line.From = Vector2.new(p1v.X, p1v.Y)
+                        line.To = Vector2.new(p2v.X, p2v.Y)
+                        line.Color = (visibleGreen and S.Color) or (occluded and Color3.fromRGB(255,0,0) or Color3.fromRGB(255,120,120))
+                        line.Visible = (S.Mode == "Skeleton" or S.Skeleton)
+                    end)
+                else
+                    line.Visible = false
+                end
+            else line.Visible = false end
+        end
+    end
+
+    if esp.drawings.tracer then
+        local viewport = Camera.ViewportSize
+        local center = Vector2.new(viewport.X/2, viewport.Y/2)
+        pcall(function()
+            esp.drawings.tracer.From = center
+            esp.drawings.tracer.To = Vector2.new(vec.X, vec.Y)
+            esp.drawings.tracer.Color = (visibleGreen and S.Color) or (occluded and Color3.fromRGB(255,0,0) or Color3.fromRGB(255,120,120))
+            esp.drawings.tracer.Visible = (S.Mode == "Tracer" or S.Tracer)
+        end)
+    end
+end
+
+function ZOV.CreateESP(player)
+    if not player or player == LocalPlayer then return end
+    if ZOV._esps[player] then return ZOV._esps[player] end
+    local esp = {}
+    esp.player = player
+    esp.drawings = ZOV.CreateDrawings()
+    esp.hl = nil
+    esp._conn = RunService.RenderStepped:Connect(function()
+        if S.Enabled then ZOV.UpdateESPFor(player, esp)
+        else ZOV.HideAll(esp.drawings); if esp.hl then pcall(function() esp.hl.Enabled = false end) end end
+    end)
+    esp._charAdded = player.CharacterAdded:Connect(function() task.wait(0.6) end)
+    esp.cleanup = function()
+        if esp._conn and esp._conn.Connected then pcall(function() esp._conn:Disconnect() end) end
+        if esp._charAdded and esp._charAdded.Connected then pcall(function() esp._charAdded:Disconnect() end) end
+        ZOV.HideAll(esp.drawings)
+        ZOV.CleanupDrawings(esp.drawings)
+        if esp.hl and esp.hl.Parent then pcall(function() esp.hl:Destroy() end) end
+        esp.drawings = nil; esp.hl = nil
+    end
+    ZOV._esps[player] = esp
+    return esp
+end
+
+function ZOV.RemoveESP(player) if ZOV._esps[player] and ZOV._esps[player].cleanup then pcall(ZOV._esps[player].cleanup) end; ZOV._esps[player] = nil end
+function ZOV.CreateAll() for _,p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer then ZOV.CreateESP(p) end end end
+function ZOV.ClearAll() for p,esp in pairs(ZOV._esps) do pcall(function() esp.cleanup() end); ZOV._esps[p] = nil end end
+
+Players.PlayerAdded:Connect(function(p) task.defer(function() if S.Enabled then ZOV.CreateESP(p) end end) end)
+Players.PlayerRemoving:Connect(function(p) ZOV.RemoveESP(p) end)
+
+if not pcall(function() return Drawing and typeof(Drawing.new) == "function" end) then S.DrawingAvailable = false; warn("Drawing API não disponível — ESP desabilitado.") end
+
+-- ===== Aimbot (existing from Master Menu) =====
+local aimbotSettings = {
+    FOV = 100,
+    MaxDistance = 125,
+    Smoothness = 0.4,
+    Enabled = true,
+    ShowFOV = true,
+    HeadOffset = Vector3.new(0,0.05,0),
+    isMobile = UserInputService.TouchEnabled,
+    HeadSizeEnabled = false,
+    HeadSize = 5
+}
+
+local DrawingCircle = nil
+pcall(function()
+    if Drawing and typeof(Drawing.new) == "function" then
+        DrawingCircle = Drawing.new("Circle")
+        DrawingCircle.Transparency = 1
+        DrawingCircle.Thickness = 2
+        DrawingCircle.Color = Color3.fromRGB(50,255,50)
+        DrawingCircle.Radius = aimbotSettings.FOV
+        DrawingCircle.Filled = false
+        if Camera and Camera.ViewportSize then DrawingCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2) end
+    end
+end)
+
+local function getClosestHead()
+    local closest, shortestDistance = nil, aimbotSettings.FOV
+    local cameraPos = (Camera and Camera.CFrame and Camera.CFrame.Position) or Vector3.zero
+    local cameraLook = (Camera and Camera.CFrame and Camera.CFrame.LookVector) or Vector3.new(0,0,-1)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            if humanoid and humanoid.Health>0 and head then
+                local success, direction = pcall(function() return (head.Position - cameraPos).Unit end)
+                if not success then continue end
+                local dot = cameraLook:Dot(direction); if dot>1 then dot=1 elseif dot<-1 then dot=-1 end
+                local angle = math.deg(math.acos(dot))
+                if angle <= aimbotSettings.FOV/2 then
+                    local distance = (head.Position - cameraPos).Magnitude
+                    if distance <= aimbotSettings.MaxDistance then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                        if onScreen then
+                            local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - Camera.ViewportSize/2).Magnitude
+                            if dist2D < shortestDistance then shortestDistance, closest = dist2D, head end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function modifyHeads()
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player~=LocalPlayer and player.Character then
+            pcall(function()
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    if aimbotSettings.HeadSizeEnabled then
+                        head.Size = Vector3.new(aimbotSettings.HeadSize, aimbotSettings.HeadSize, aimbotSettings.HeadSize)
+                        head.CanCollide = false
+                    else
+                        head.Size = Vector3.new(1.1379,1.1422,1.1380)
+                        head.CanCollide = true
+                    end
+                end
+            end)
+        end
+    end
+end
+
+local function aimbotLoop()
+    if DrawingCircle then
+        DrawingCircle.Radius = aimbotSettings.FOV
+        if Camera and Camera.ViewportSize then DrawingCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2) end
+        DrawingCircle.Visible = aimbotSettings.ShowFOV
+    end
+    if aimbotSettings.HeadSizeEnabled then modifyHeads() end
+    if not aimbotSettings.Enabled then return end
+    local target = getClosestHead()
+    if target then
+        local pos = target.Position + aimbotSettings.HeadOffset
+        if aimbotSettings.isMobile then
+            local character = LocalPlayer.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health>0 then
+                local camPos = Camera.CFrame.Position
+                local targetDir = (pos - camPos).Unit
+                Camera.CFrame = CFrame.new(camPos, camPos + targetDir)
+                if Camera.CameraType==Enum.CameraType.Scriptable then Camera.CameraSubject = humanoid end
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                if hrp then local look = (pos - hrp.Position).Unit; hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + Vector3.new(look.X,0,look.Z)) end
+            end
+        else
+            local screenPos, onScreen = Camera:WorldToViewportPoint(pos)
+            if onScreen and mousemoverel then
+                local dx = screenPos.X - Camera.ViewportSize.X/2
+                local dy = screenPos.Y - Camera.ViewportSize.Y/2
+                local sx = tonumber(aimbotSettings.Smoothness) or 0.4
+                mousemoverel(dx * sx, dy * sx)
+            end
+        end
+    end
+end
+
+local renderConnection = RunService.RenderStepped:Connect(aimbotLoop)
+
+-- ===== PlayerUtils (clean + reuse) =====
+local PlayerUtils = {}
+function PlayerUtils.getPlayerByNamePartial(name)
+    return findPlayerByPartial(name)
+end
+function PlayerUtils.teleportToPlayer(target)
+    local ok,err = pcall(function()
+        local t = target
+        if type(target)=="string" then t = PlayerUtils.getPlayerByNamePartial(target) end
+        if not t or not t.Character or not t.Character:FindFirstChild("HumanoidRootPart") then error("alvo inválido") end
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then error("seu personagem não tem HRP") end
+        hrp.CFrame = t.Character.HumanoidRootPart.CFrame + Vector3.new(0,3,0)
+    end)
+    return ok,err
+end
+function PlayerUtils.bringPlayerHere(target)
+    local ok,err = pcall(function()
+        local t = target
+        if type(target)=="string" then t = PlayerUtils.getPlayerByNamePartial(target) end
+        if not t or not t.Character or not t.Character:FindFirstChild("HumanoidRootPart") then error("alvo inválido") end
+        pcall(function() t.Character.HumanoidRootPart.CFrame = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.CFrame) or CFrame.new() end)
+    end)
+    return ok,err
+end
+function PlayerUtils.setWalkSpeed(value)
+    local ok,err = pcall(function() local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local h = char:FindFirstChildOfClass("Humanoid"); if h then h.WalkSpeed = tonumber(value) or 16 end end) return ok,err
+end
+function PlayerUtils.resetCharacter() pcall(function() if LocalPlayer.Character then LocalPlayer.Character:BreakJoints() end end) end
+function PlayerUtils.healSelf() pcall(function() local h = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")); if h then h.Health = h.MaxHealth end end) end
+local invisState=false; function PlayerUtils.toggleInvis(state) invisState = not (state==nil) and state or (not invisState); pcall(function() local char = LocalPlayer.Character; if not char then return end; for _,part in ipairs(char:GetDescendants()) do if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then part.Transparency = invisState and 1 or 0; part.CanCollide = not invisState elseif part:IsA("Decal") then part.Transparency = invisState and 1 or 0 end end end) end
+local freezeState=false; function PlayerUtils.freezeSelf(state) freezeState = not (state==nil) and state or (not freezeState); pcall(function() local char = LocalPlayer.Character; if not char then return end; local h = char:FindFirstChildOfClass("Humanoid"); if h then h.PlatformStand = freezeState end; for _,part in ipairs(char:GetDescendants()) do if part:IsA("BasePart") then pcall(function() part.Anchored = freezeState end) end end end) end
+function PlayerUtils.giveTool(toolName) local ok,err = pcall(function() if not toolName or toolName=="" then error("toolName empty") end; local tool = ReplicatedStorage:FindFirstChild(toolName, true); if not tool then error("tool not found") end; local clone = tool:Clone(); clone.Parent = LocalPlayer.Backpack end) return ok,err end
+function PlayerUtils.getClosestPlayer() local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"); if not myHRP then return nil end; local best,bestDist = nil,math.huge; for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then local d = (pl.Character.HumanoidRootPart.Position - myHRP.Position).Magnitude if d < bestDist then bestDist, best = d,pl end end end return best,bestDist end
+
+_G.MasterMenuZov = _G.MasterMenuZov or {}
+_G.MasterMenuZov.PlayerUtils = PlayerUtils
+
+-- ===== AdvAim (Risco) Integration (compact) =====
+local ADV = {}
+ADV.CONFIG = {
+    SCREEN_RADIUS = 100000000000,
+    MAX_DIST = 300,
+    WALL_CHECK = true,
+    FRIEND_CHECK = false,
+    REQUIRED_SHOTS = 2,
+    AUTO_MODE = true,
+    FIRE_COOLDOWN = 0.05,
+    IGNORE_USERNAMES = { ["banido3px"] = true },
+    ALWAYS_HEAD = true,
+    ALLOW_HEAD_THROUGH_GLASS = false
+}
+local adv_lastGlobalFire = 0
+local adv_shotCounters = {}
+local adv_deathConns = {}
+local adv_heartbeat_conn = nil
+local adv_weaponfired_conn = nil
+local adv_weaponHitRemote = nil
+local adv_weaponFiredRemote = nil
+local adv_running = false
+
+local function adv_findRemotes()
+    adv_weaponfired_conn = nil
+    adv_weaponFiredRemote = nil
+    adv_weaponHitRemote = nil
+    pcall(function()
+        local ok, ws = pcall(function() return ReplicatedStorage:FindFirstChild("WeaponsSystem") end)
+        if ok and ws then
+            local net = ws:FindFirstChild("Network")
+            if net then
+                adv_weaponFiredRemote = net:FindFirstChild("WeaponFired")
+                adv_weaponHitRemote = net:FindFirstChild("WeaponHit")
+            end
+        end
+        if not adv_weaponHitRemote then
+            adv_weaponHitRemote = ReplicatedStorage:FindFirstChild("WeaponHit") or workspace:FindFirstChild("WeaponHit")
+        end
+    end)
+end
+
+local function adv_isNameIgnored(player)
+    if not player or not player.Name then return false end
+    return ADV.CONFIG.IGNORE_USERNAMES[string.lower(player.Name)] == true
+end
+
+local function adv_isFriendSafe(player)
+    if adv_isNameIgnored(player) then return true end
+    if not ADV.CONFIG.FRIEND_CHECK then return false end
+    if not LocalPlayer then return false end
+    local ok, res = pcall(function() return LocalPlayer:IsFriendsWith(player.UserId) end)
+    return ok and res
+end
+
+local function adv_getChestPart(character)
+    if not character then return nil end
+    return character:FindFirstChild("HumanoidRootPart")
+        or character:FindFirstChild("UpperTorso")
+        or character:FindFirstChild("Torso")
+end
+
+local function adv_raycastHit(orig, dest, blacklist)
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = blacklist or {}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.IgnoreWater = true
+    local ok, res = pcall(function() return workspace:Raycast(orig, dest - orig, params) end)
+    if not ok then return nil end
+    return res
+end
+
+local function adv_hasWallBetween(orig, dest)
+    if not ADV.CONFIG.WALL_CHECK then return false end
+    if not orig or not dest then return false end
+    local res = adv_raycastHit(orig, dest, {LocalPlayer.Character})
+    if not res then return false end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p.Character and res.Instance and res.Instance:IsDescendantOf(p.Character) then
+            return false
+        end
+    end
+    return true
+end
+
+local function adv_isPartVisible(orig, part)
+    if not part then return false end
+    local res = adv_raycastHit(orig, part.Position, {LocalPlayer.Character})
+    if not res then return true end
+    if res.Instance and res.Instance:IsDescendantOf(part.Parent) then return true end
+    if ADV.CONFIG.ALLOW_HEAD_THROUGH_GLASS and res.Instance and res.Instance.Material == Enum.Material.Glass then return true end
+    return false
+end
+
+local function adv_sendHitSafe(arma, targetPart, position)
+    if not adv_weaponHitRemote or typeof(adv_weaponHitRemote.FireServer) ~= "function" then return end
+    if not arma or not targetPart or not position then return end
+    local args = {
+        arma,
+        {
+            p = position,
+            pid = 1,
+            part = targetPart,
+            d = 0,
+            maxDist = ADV.CONFIG.MAX_DIST,
+            h = targetPart,
+            m = targetPart.Material or Enum.Material.Plastic,
+            n = Vector3.new(0,1,0),
+            t = 0.5,
+            sid = 1
+        },
+        true
+    }
+    pcall(function() adv_weaponHitRemote:FireServer(unpack(args)) end)
+end
+
+local function adv_getBestTarget()
+    if not Camera or not LocalPlayer then return nil end
+    local fromPos = Camera.CFrame.Position
+    local viewport = Camera.ViewportSize
+    local screenCenter = Vector2.new(viewport.X/2, viewport.Y/2)
+    local bestPlayer = nil
+    local bestScore = math.huge
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character.Parent then
+            if adv_isFriendSafe(p) then adv_shotCounters[p.UserId] = 0
+            else
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    local head = p.Character:FindFirstChild("Head")
+                    local chest = adv_getChestPart(p.Character)
+                    local evalPart = head or chest
+                    if evalPart then
+                        local dist3 = (evalPart.Position - fromPos).Magnitude
+                        if dist3 <= ADV.CONFIG.MAX_DIST then
+                            local screenPos, onScreen = Camera:WorldToViewportPoint(evalPart.Position)
+                            if onScreen then
+                                local dx = screenPos.X - screenCenter.X
+                                local dy = screenPos.Y - screenCenter.Y
+                                local dist2 = math.sqrt(dx*dx + dy*dy)
+                                local score = dist2 + (dist3 / 10)
+                                if score < bestScore and dist2 <= ADV.CONFIG.SCREEN_RADIUS then
+                                    local visible = false
+                                    if head and adv_isPartVisible(fromPos, head) then visible = true
+                                    elseif chest and adv_isPartVisible(fromPos, chest) then visible = true end
+                                    if visible then bestScore = score; bestPlayer = p end
+                                end
+                            end
+                        end
+                    end
+                else adv_shotCounters[p.UserId] = 0 end
+            end
+        end
+    end
+    return bestPlayer
+end
+
+local function adv_attemptShootAt(player)
+    if not player or not player.Character then return end
+    local uid = player.UserId
+    local head = player.Character:FindFirstChild("Head")
+    local chest = adv_getChestPart(player.Character)
+    if not head and not chest then return end
+
+    adv_shotCounters[uid] = adv_shotCounters[uid] or 0
+    local now = tick()
+    if now - adv_lastGlobalFire < ADV.CONFIG.FIRE_COOLDOWN then return end
+
+    local targetPart = chest
+    if ADV.CONFIG.ALWAYS_HEAD and head and adv_isPartVisible(Camera.CFrame.Position, head) then
+        targetPart = head
+    else
+        if adv_shotCounters[uid] >= ADV.CONFIG.REQUIRED_SHOTS and head and adv_isPartVisible(Camera.CFrame.Position, head) then
+            targetPart = head
+        else targetPart = chest end
+    end
+
+    if not targetPart then return end
+    if ADV.CONFIG.WALL_CHECK and adv_hasWallBetween(Camera.CFrame.Position, targetPart.Position) then return end
+
+    local tool = LocalPlayer and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+    local armaParam = tool or (tool and tool.Name) or "UnknownTool"
+
+    adv_sendHitSafe(armaParam, targetPart, targetPart.Position)
+    adv_lastGlobalFire = now
+
+    if targetPart == chest then adv_shotCounters[uid] = (adv_shotCounters[uid] or 0) + 1 else adv_shotCounters[uid] = 0 end
+end
+
+Players.PlayerAdded:Connect(function(p) adv_shotCounters[p.UserId] = 0 end)
+Players.PlayerRemoving:Connect(function(p) adv_shotCounters[p.UserId] = nil if adv_deathConns[p.UserId] then pcall(function() adv_deathConns[p.UserId]:Disconnect() end) adv_deathConns[p.UserId] = nil end end)
+for _,p in ipairs(Players:GetPlayers()) do adv_shotCounters[p.UserId] = 0 end
+
+local function adv_bindDeath(player)
+    if not player or not player.Character then return end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    if adv_deathConns[player.UserId] then pcall(function() adv_deathConns[player.UserId]:Disconnect() end) end
+    adv_deathConns[player.UserId] = hum.Died:Connect(function() adv_shotCounters[player.UserId] = 0 end)
+end
+Players.PlayerAdded:Connect(adv_bindDeath)
+for _,p in ipairs(Players:GetPlayers()) do adv_bindDeath(p) end
+
+local function adv_start()
+    if adv_running then return end
+    adv_running = true
+    adv_findRemotes()
+    if adv_weaponFiredRemote and typeof(adv_weaponFiredRemote.OnClientEvent) == "Instance" then
+        adv_weaponfired_conn = adv_weaponFiredRemote.OnClientEvent:Connect(function()
+            local alvo = adv_getBestTarget()
+            if alvo then adv_attemptShootAt(alvo) end
+        end)
+    end
+    if ADV.CONFIG.AUTO_MODE then
+        adv_heartbeat_conn = RunService.Heartbeat:Connect(function()
+            if not LocalPlayer or not LocalPlayer.Character then return end
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then return end
+            local alvo = adv_getBestTarget()
+            if alvo then adv_attemptShootAt(alvo) end
+        end)
+    end
+end
+
+local function adv_stop()
+    adv_running = false
+    if adv_heartbeat_conn and adv_heartbeat_conn.Connected then pcall(function() adv_heartbeat_conn:Disconnect() end) end
+    if adv_weaponfired_conn and adv_weaponfired_conn.Connected then pcall(function() adv_weaponfired_conn:Disconnect() end) end
+    adv_heartbeat_conn = nil
+    adv_weaponfired_conn = nil
+end
+
+_G.AdvAim = _G.AdvAim or {}
+_G.AdvAim.CONFIG = ADV.CONFIG
+_G.AdvAim.Start = adv_start
+_G.AdvAim.Stop = adv_stop
+_G.AdvAim.IsRunning = function() return adv_running end
+_G.AdvAim.ListIgnored = function()
+    local out = {}
+    for k,v in pairs(ADV.CONFIG.IGNORE_USERNAMES) do if v then table.insert(out,k) end end
+    return out
+end
+
+-- ===== Sequestro module =====
+local Kidnap = {}
+Kidnap.jailCFrame = CFrame.new(0, 50, 0) -- default jail position (edite para posição no seu mapa)
+Kidnap.savedPositions = {} -- map userId -> CFrame
+Kidnap.savedTools = {} -- map userId -> {tools}
+Kidnap.radiusDefault = 20
+
+-- freeze (try anchor all BaseParts & set PlatformStand)
+local function freezeCharacter(char, state)
+    if not char then return end
+    pcall(function()
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then humanoid.PlatformStand = state end
+        for _,part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function() part.Anchored = state end)
+            end
+        end
+    end)
+end
+
+local function stripToolsFromChar(char)
+    if not char then return {} end
+    local removed = {}
+    pcall(function()
+        for _, tool in ipairs(char:GetChildren()) do
+            if tool:IsA("Tool") then
+                table.insert(removed, tool:Clone())
+                pcall(function() tool:Destroy() end)
+            end
+        end
+        -- also backpack
+        local pl = Players:GetPlayerFromCharacter(char)
+        if pl and pl.Backpack then
+            for _, tool in ipairs(pl.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    table.insert(removed, tool:Clone())
+                    pcall(function() tool:Destroy() end)
+                end
+            end
+        end
+    end)
+    return removed
+end
+
+function Kidnap.kidnapPlayer(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then safeNotify("Sequestro","Alvo inválido.",2); return false end
+    local uid = targetPlayer.UserId
+    -- save original
+    pcall(function() Kidnap.savedPositions[uid] = targetPlayer.Character.HumanoidRootPart.CFrame end)
+    -- strip tools
+    Kidnap.savedTools[uid] = stripToolsFromChar(targetPlayer.Character)
+    -- teleport to jail
+    pcall(function() targetPlayer.Character.HumanoidRootPart.CFrame = Kidnap.jailCFrame end)
+    -- freeze / anchor
+    freezeCharacter(targetPlayer.Character, true)
+    safeNotify("Sequestro","Alvo sequestrado: "..targetPlayer.Name,2)
+    return true
+end
+
+function Kidnap.releasePlayer(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then safeNotify("Sequestro","Alvo inválido.",2); return false end
+    local uid = targetPlayer.UserId
+    local previous = Kidnap.savedPositions[uid]
+    if previous then
+        pcall(function() targetPlayer.Character.HumanoidRootPart.CFrame = previous + Vector3.new(0,3,0) end)
+    else
+        -- teleport near you
+        pcall(function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then targetPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(3,0,0) end end)
+    end
+    -- unfreeze
+    freezeCharacter(targetPlayer.Character, false)
+    -- do NOT restore tools automatically (server may block). Notify saved tools.
+    if Kidnap.savedTools[uid] and #Kidnap.savedTools[uid] > 0 then
+        safeNotify("Sequestro","Ferramentas removidas salvas no client (não restauradas server-side).",3)
+    end
+    Kidnap.savedPositions[uid] = nil
+    Kidnap.savedTools[uid] = nil
+    safeNotify("Sequestro","Alvo liberado: "..targetPlayer.Name,2)
+    return true
+end
+
+function Kidnap.kidnapNearby(radius)
+    radius = radius or Kidnap.radiusDefault
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then safeNotify("Sequestro","Você não tem HRP.",2); return end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (p.Character.HumanoidRootPart.Position - myHRP.Position).Magnitude
+            if d <= radius then
+                Kidnap.kidnapPlayer(p)
+            end
+        end
+    end
+end
+
+function Kidnap.stripTarget(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+    Kidnap.savedTools[targetPlayer.UserId] = stripToolsFromChar(targetPlayer.Character)
+    safeNotify("Sequestro","Ferramentas removidas de "..targetPlayer.Name,2)
+end
+
+-- ===== Speed Lock (function) =====
+local speedLockConn = nil
+local function AtivarSpeedLock()
+    local player = LocalPlayer
+    local function aplicar(hum)
+        if not hum then return end
+        local function enforce()
+            if not hum or not hum.Parent then return end
+            pcall(function() hum.WalkSpeed = 26 end)
+        end
+        enforce()
+        -- reconnect property changed
+        pcall(function()
+            hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                if hum and hum.WalkSpeed ~= 26 then
+                    hum.WalkSpeed = 26
+                end
+            end)
+        end)
+    end
+
+    if player.Character then
+        aplicar(player.Character:FindFirstChildOfClass("Humanoid"))
+    end
+
+    player.CharacterAdded:Connect(function(char)
+        local hum = char:WaitForChild("Humanoid")
+        aplicar(hum)
+    end)
+end
+
+-- ===== UI: build master window & tabs (Zov UI) =====
+if not Library then
+    warn("UI Library indisponível — você ainda pode usar hooks globais.")
+else
+    local Window = Library:CreateWindow("Bec Menu", Enum.KeyCode.RightControl)
+
+    -- Tab: Pvp (Aimbot)
+    local TabPvp = Window:AddTab("Pvp", 1)
+    local PvpSection = TabPvp:AddSection("Aimbot")
+    PvpSection:AddToggle("Ativar Aimbot ( Pc )", aimbotSettings.Enabled, nil, function(state) aimbotSettings.Enabled = state end)
+    PvpSection:AddToggle("Aumentar Cabeças", aimbotSettings.HeadSizeEnabled, nil, function(state) aimbotSettings.HeadSizeEnabled = state; modifyHeads() end)
+    PvpSection:AddSlider("Tamanho da Cabeça", 2, 5, aimbotSettings.HeadSize, 0.5, nil, function(value) aimbotSettings.HeadSize = value; if aimbotSettings.HeadSizeEnabled then modifyHeads() end end)
+    PvpSection:AddToggle("Speed Lock 26", false, nil, function(state)
+        if state then AtivarSpeedLock(); safeNotify("SpeedLock","Ativado (26)",1) else
+            -- best-effort: reset to normal
+            pcall(function() local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid"); if h then h.WalkSpeed = 16 end end)
+            safeNotify("SpeedLock","Desativado",1)
+        end
+    end)
+    PvpSection:AddToggle("Visibilidade Do Fov", aimbotSettings.ShowFOV, nil, function(state) aimbotSettings.ShowFOV = state if DrawingCircle then DrawingCircle.Visible = state end end)
+    PvpSection:AddSlider("Tamanho Do Fov", 20, 300, aimbotSettings.FOV, 5, "°", function(value) aimbotSettings.FOV = value if DrawingCircle then DrawingCircle.Radius = value end end)
+    PvpSection:AddSlider("Distancia Maxima", 25, 450, aimbotSettings.MaxDistance, 25, "studs", function(value) aimbotSettings.MaxDistance = value end)
+    PvpSection:AddSlider("Smoothness", 0.05, 1, aimbotSettings.Smoothness, 0.01, nil, function(value) aimbotSettings.Smoothness = value end)
+    PvpSection:AddKeybind("Aimbot Key", Enum.KeyCode.Q, nil, function() aimbotSettings.Enabled = not aimbotSettings.Enabled end)
+
+    TabPvp:AddSection("Visuals"):AddToggle("Tela Esticada", false, nil, function(value)
+        if value then
+            local conn
+            conn = RunService.RenderStepped:Connect(function()
+                if not Workspace.CurrentCamera then return end
+                local cf = Workspace.CurrentCamera.CFrame
+                Workspace.CurrentCamera.CFrame = cf * CFrame.new(0,0,0, 1,0,0, 0,0.65,0, 0,0,1)
+            end)
+            task.delay(0.05, function() if conn and conn.Connected then conn:Disconnect() end end)
+        end
+    end)
+
+    -- Tab: Comprar
+    local TabComprar = Window:AddTab("Comprar", 2)
+    local ComprarSection = TabComprar:AddSection("Loja")
+    ComprarSection:AddButton("Comprar Coca-Cola", function()
+        pcall(function() ReplicatedStorage:WaitForChild("InventarioSystem"):WaitForChild("Comprar"):FireServer("Coca-Cola") end)
+    end)
+    ComprarSection:AddButton("Comprar Pizza", function()
+        pcall(function() ReplicatedStorage:WaitForChild("InventarioSystem"):WaitForChild("Comprar"):FireServer("Pizza") end)
+    end)
+
+    -- Tab: Staff
+    local TabStaff = Window:AddTab("Staff", 3)
+    local StaffSection = TabStaff:AddSection("Detecção Staff")
+    StaffSection:AddButton("Detecção Staff", function()
+        local grupoMonitorado = 4738618
+        local cargosDetectar = {"[BIB]","[SUP]","[Responsavel]","[Responsavel Perm Booster]","[Responsavel Superior]"}
+        local function cargoEhSuspeito(cargo) for _,nome in ipairs(cargosDetectar) do if cargo==nome then return true end end return false end
+        for _, pl in ipairs(Players:GetPlayers()) do
+            local success, role = pcall(function() return pl:GetRoleInGroup(grupoMonitorado) end)
+            if success and cargoEhSuspeito(role) then
+                warn(pl.Name .. " detectado com cargo suspeito: " .. tostring(role))
+                pcall(function() if pl==LocalPlayer then LocalPlayer:Kick("Staff Detectado") else LocalPlayer:Kick("bahhh") end end)
+            end
+        end
+    end)
+
+    -- Tab: Player
+    local TabPlayer = Window:AddTab("Player", 4)
+    local PlayerSection = TabPlayer:AddSection("Player Actions")
+    PlayerSection:AddTextbox("Alvo (nome parcial)", nil, function(text) PlayerSection._lastTarget = text end)
+    PlayerSection:AddButton("Teleportar para Alvo", function()
+        local ok,err = PlayerUtils.teleportToPlayer(PlayerSection._lastTarget or "")
+        if not ok then safeNotify("Player","Erro: "..tostring(err),3) else safeNotify("Player","Teleportado.",2) end
+    end)
+    PlayerSection:AddButton("Traz Alvo pra Mim", function()
+        local ok,err = PlayerUtils.bringPlayerHere(PlayerSection._lastTarget or "")
+        if not ok then safeNotify("Player","Erro: "..tostring(err),3) else safeNotify("Player","Tentou trazer alvo.",2) end
+    end)
+    PlayerSection:AddTextbox("Set WalkSpeed (num)", nil, function(text) PlayerSection._walkSpeedValue = text end)
+    PlayerSection:AddButton("Aplicar WalkSpeed", function()
+        local ok,err = PlayerUtils.setWalkSpeed(tonumber(PlayerSection._walkSpeedValue) or 16)
+        if not ok then safeNotify("Player","Erro: "..tostring(err),2) else safeNotify("Player","WalkSpeed aplicado.",2) end
+    end)
+    PlayerSection:AddButton("Resetar Personagem", function() PlayerUtils.resetCharacter(); safeNotify("Player","Reset solicitado.",1) end)
+    PlayerSection:AddButton("Curar", function() PlayerUtils.healSelf(); safeNotify("Player","Curado.",1) end)
+    PlayerSection:AddToggle("Toggle Invis (local)", false, nil, function(state) PlayerUtils.toggleInvis(state); safeNotify("Player","Invis: "..tostring(state),1) end)
+    PlayerSection:AddToggle("Freeze (local)", false, nil, function(state) PlayerUtils.freezeSelf(state); safeNotify("Player","Freeze: "..tostring(state),1) end)
+    PlayerSection:AddTextbox("Nome da Tool (ReplicatedStorage)", nil, function(text) PlayerSection._toolName = text end)
+    PlayerSection:AddButton("Dar Tool", function()
+        local ok,err = PlayerUtils.giveTool(PlayerSection._toolName or "")
+        if not ok then safeNotify("Player","Erro: "..tostring(err),3) else safeNotify("Player","Tool adicionada ao Backpack.",2) end
+    end)
+    PlayerSection:AddButton("Gui de Trabalhos", function()
+        local a = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("Trabalhos")
+        if a and a:FindFirstChild("Trabalhos") then a.Trabalhos.Visible = true else safeNotify("Aviso","GUI de Trabalhos não encontrada.",2) end
+    end)
+    PlayerSection:AddButton("Se Desalgemar", function()
+        local algemadoValue = LocalPlayer:FindFirstChild("Prisao") and LocalPlayer.Prisao:FindFirstChild("Algemado")
+        if algemadoValue then if algemadoValue.Value == true then algemadoValue.Value = false; safeNotify("Sucesso","Você foi desalgemado.",2) end else safeNotify("Aviso","Valor 'Algemado' não encontrado.",2) end
+    end)
+    PlayerSection:AddButton("Ant Multa", function()
+        local carecaodeiamultas = workspace:FindFirstChild("AutoEscola") and workspace.AutoEscola:FindFirstChild("LocalMultas")
+        if carecaodeiamultas then pcall(function() carecaodeiamultas:Destroy() end); safeNotify("Sucesso","Multas removidas.",2) else safeNotify("Aviso","Local de multas não encontrado.",2) end
+    end)
+
+    -- Tab: Esp / Visuals -> integrated Ultra Clean ZOV
+    local TabEsp = Window:AddTab("Esp", 5)
+    local EspSectionUI = TabEsp:AddSection("ESP Settings")
+
+    EspSectionUI:AddToggle("Ativar ESP", S.Enabled, nil, function(state)
+        S.Enabled = state
+        if state then ZOV.CreateAll(); safeNotify("ESP","Ativado",1) else ZOV.ClearAll(); safeNotify("ESP","Desativado",1) end
+    end)
+    EspSectionUI:AddToggle("Caixas", S.Box, nil, function(v) S.Box = v end)
+    EspSectionUI:AddToggle("Nome + Dist", S.Name, nil, function(v) S.Name = v end)
+    EspSectionUI:AddToggle("Vida", S.Health, nil, function(v) S.Health = v end)
+    EspSectionUI:AddToggle("Esqueleto", S.Skeleton, nil, function(v) S.Skeleton = v end)
+    EspSectionUI:AddToggle("Tool na Mão", S.Tool, nil, function(v) S.Tool = v end)
+    EspSectionUI:AddToggle("Tracer", S.Tracer, nil, function(v) S.Tracer = v end)
+    EspSectionUI:AddToggle("Chams (Highlight)", S.Chams, nil, function(v) S.Chams = v; for _,esp in pairs(ZOV._esps) do pcall(function() UpdateHighlight(esp, esp.player and esp.player.Character or nil, true) end) end end)
+    EspSectionUI:AddDropdown("Modo Visual", {"Box","Tracer","Skeleton","Chams"}, (function() for i,v in ipairs({"Box","Tracer","Skeleton","Chams"}) do if v==S.Mode then return i end end; return 1 end)(), nil, function(selected) local modes={"Box","Tracer","Skeleton","Chams"} S.Mode = modes[selected] or "Box" end)
+    EspSectionUI:AddSlider("Distância Máx (ESP)", 50, 1000, S.MaxDistance, 25, "studs", function(val) S.MaxDistance = val end)
+    EspSectionUI:AddColorPicker("Cor do ESP", S.Color, nil, function(col)
+        S.Color = col
+        for p,esp in pairs(ZOV._esps) do pcall(function()
+            if esp.drawings and esp.drawings.box then esp.drawings.box.Color = col end
+            if esp.drawings and esp.drawings.tracer then esp.drawings.tracer.Color = col end
+            if esp.drawings and esp.drawings.skeleton then for _,l in ipairs(esp.drawings.skeleton) do l.Color = col end end
+            if esp.hl then esp.hl.FillColor = col; esp.hl.OutlineColor = Color3.new(math.clamp(col.R*0.7,0,1), math.clamp(col.G*0.7,0,1), math.clamp(col.B*0.7,0,1)) end
+        end) end
+    end)
+    EspSectionUI:AddButton("Destroy all ESPs", function() ZOV.ClearAll(); safeNotify("ESP","Destroyed all ESPs",2) end)
+
+    local Misc = TabEsp:AddSection("Misc")
+    Misc:AddToggle("Name Tags", S.Name, nil, function(state) S.Name = state end)
+    Misc:AddToggle("Tool Tag", S.Tool, nil, function(state) S.Tool = state end)
+    Misc:AddToggle("Health Bar", S.Health, nil, function(state) S.Health = state end)
+
+    -- Tab: Risco (AdvAim)
+    local TabRisco = Window:AddTab("Risco", 6)
+    local RiscoSection = TabRisco:AddSection("AdvAim Settings")
+
+    RiscoSection:AddToggle("Ativar AdvAim", false, nil, function(state)
+        if state then adv_start(); safeNotify("AdvAim", "Ativado", 1) else adv_stop(); safeNotify("AdvAim", "Desativado", 1) end
+    end)
+    RiscoSection:AddToggle("Auto Mode (Heartbeat)", ADV.CONFIG.AUTO_MODE, nil, function(v) ADV.CONFIG.AUTO_MODE = v if adv_running then adv_stop(); adv_start() end end)
+    RiscoSection:AddToggle("Priorizar Head Sempre (ALWAYS_HEAD)", ADV.CONFIG.ALWAYS_HEAD, nil, function(v) ADV.CONFIG.ALWAYS_HEAD = v end)
+    RiscoSection:AddToggle("Verificar Paredes (WALL_CHECK)", ADV.CONFIG.WALL_CHECK, nil, function(v) ADV.CONFIG.WALL_CHECK = v end)
+    RiscoSection:AddToggle("Permitir vidro (ALLOW_HEAD_THROUGH_GLASS)", ADV.CONFIG.ALLOW_HEAD_THROUGH_GLASS, nil, function(v) ADV.CONFIG.ALLOW_HEAD_THROUGH_GLASS = v end)
+    RiscoSection:AddToggle("Ignorar Friends (FRIEND_CHECK)", ADV.CONFIG.FRIEND_CHECK, nil, function(v) ADV.CONFIG.FRIEND_CHECK = v end)
+    RiscoSection:AddSlider("Max Distance (studs)", 50, 1000, ADV.CONFIG.MAX_DIST, 10, "studs", function(v) ADV.CONFIG.MAX_DIST = v end)
+    RiscoSection:AddSlider("Fire Cooldown (s)", 0, 1, ADV.CONFIG.FIRE_COOLDOWN, 0.01, "s", function(v) ADV.CONFIG.FIRE_COOLDOWN = v end)
+    RiscoSection:AddSlider("Required Shots (peito antes head)", 0, 10, ADV.CONFIG.REQUIRED_SHOTS, 1, nil, function(v) ADV.CONFIG.REQUIRED_SHOTS = math.floor(v) end)
+
+    local ignoreNameTextbox = nil
+    RiscoSection:AddTextbox("Adicionar nome ignorado", nil, function(text) ignoreNameTextbox = text end)
+    RiscoSection:AddButton("Adicionar ignore", function()
+        if type(ignoreNameTextbox) == "string" and ignoreNameTextbox ~= "" then ADV.CONFIG.IGNORE_USERNAMES[string.lower(ignoreNameTextbox)] = true; safeNotify("AdvAim","Adicionado: "..ignoreNameTextbox,2) else safeNotify("AdvAim","Nome inválido",2) end
+    end)
+    RiscoSection:AddTextbox("Remover nome ignorado", nil, function(text) ignoreNameTextbox = text end)
+    RiscoSection:AddButton("Remover ignore", function()
+        if type(ignoreNameTextbox) == "string" and ignoreNameTextbox ~= "" then ADV.CONFIG.IGNORE_USERNAMES[string.lower(ignoreNameTextbox)] = nil; safeNotify("AdvAim","Removido: "..ignoreNameTextbox,2) else safeNotify("AdvAim","Nome inválido",2) end
+    end)
+    RiscoSection:AddButton("Listar Ignorados (console)", function() local list = {} for k,v in pairs(ADV.CONFIG.IGNORE_USERNAMES) do if v then table.insert(list,k) end end; print("AdvAim ignored:", table.concat(list, ", ")); safeNotify("AdvAim","Ignorados listados no console",2) end)
+    RiscoSection:AddKeybind("AdvAim Toggle Key", Enum.KeyCode.F2, nil, function() if adv_running then adv_stop(); safeNotify("AdvAim","Toggled OFF",1) else adv_start(); safeNotify("AdvAim","Toggled ON",1) end end)
+
+    -- Tab: Sequestro (novo)
+    local TabSequestro = Window:AddTab("Sequestro", 7)
+    local SeqSection = TabSequestro:AddSection("Comandos de Sequestro / RP")
+
+    SeqSection:AddTextbox("Alvo (nome parcial)", nil, function(text) SeqSection._lastTarget = text end)
+    SeqSection:AddButton('Enviar frase pronta (Chat)', function()
+        local msg = "Parou, Mão para trás e já encoste, Comunicação Cortada!, Sem pedir QRR"
+        safeFireSayMessage(msg)
+        safeNotify("Sequestro","Mensagem enviada: "..msg,2)
+    end)
+    SeqSection:AddTextbox("Mensagem custom (chat)", nil, function(txt) SeqSection._customMsg = txt end)
+    SeqSection:AddButton("Enviar mensagem custom", function()
+        local m = SeqSection._customMsg or ""
+        if m ~= "" then safeFireSayMessage(m); safeNotify("Sequestro","Mensagem enviada.",2) else safeNotify("Sequestro","Mensagem vazia.",2) end
+    end)
+
+    SeqSection:AddSlider("Sequestro Raio (studs)", 5, 200, Kidnap.radiusDefault, 5, "studs", function(v) Kidnap.radiusDefault = v end)
+    SeqSection:AddButton("Sequestro em Massa (perto de você)", function()
+        Kidnap.kidnapNearby(Kidnap.radiusDefault)
+    end)
+
+    SeqSection:AddButton("Sequestrar Alvo", function()
+        local t = SeqSection._lastTarget and findPlayerByPartial(SeqSection._lastTarget)
+        if not t then safeNotify("Sequestro","Alvo não encontrado.",2); return end
+        Kidnap.kidnapPlayer(t)
+    end)
+    SeqSection:AddButton("Liberar Alvo", function()
+        local t = SeqSection._lastTarget and findPlayerByPartial(SeqSection._lastTarget)
+        if not t then safeNotify("Sequestro","Alvo não encontrado.",2); return end
+        Kidnap.releasePlayer(t)
+    end)
+    SeqSection:AddButton("Arrancar ferramentas do Alvo", function()
+        local t = SeqSection._lastTarget and findPlayerByPartial(SeqSection._lastTarget)
+        if not t then safeNotify("Sequestro","Alvo não encontrado.",2); return end
+        Kidnap.stripTarget(t)
+    end)
+    SeqSection:AddButton("Travar Alvo (ancorar)", function()
+        local t = SeqSection._lastTarget and findPlayerByPartial(SeqSection._lastTarget)
+        if not t or not t.Character then safeNotify("Sequestro","Alvo não encontrado.",2); return end
+        freezeCharacter(t.Character, true)
+        safeNotify("Sequestro","Alvo travado.",2)
+    end)
+    SeqSection:AddButton("Destravar Alvo", function()
+        local t = SeqSection._lastTarget and findPlayerByPartial(SeqSection._lastTarget)
+        if not t or not t.Character then safeNotify("Sequestro","Alvo não encontrado.",2); return end
+        freezeCharacter(t.Character, false)
+        safeNotify("Sequestro","Alvo destravado.",2)
+    end)
+    SeqSection:AddButton("Teleport Alvo pra mim", function()
+        local t = SeqSection._lastTarget and findPlayerByPartial(SeqSection._lastTarget)
+        if not t or not t.Character or not LocalPlayer.Character then safeNotify("Sequestro","Alvo / seu personagem inválido.",2); return end
+        pcall(function() t.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(2,0,0) end)
+        safeNotify("Sequestro","Alvo teleportado próximo a você.",2)
+    end)
+    SeqSection:AddButton("Definir Jail (posição atual)", function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            Kidnap.jailCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0,0,0)
+            safeNotify("Sequestro","Jail definido na sua posição atual.",2)
+        else safeNotify("Sequestro","Não foi possível obter sua posição.",2) end
+    end)
+    SeqSection:AddButton("Mostrar saved positions (console)", function()
+        print("Saved kidnap positions:")
+        for k,v in pairs(Kidnap.savedPositions) do print(k, v) end
+        safeNotify("Sequestro","Saved positions no console.",2)
+    end)
+
+    -- Tab: Settings (Unload etc)
+    local SettingsTab = Window:AddTab("Settings", 100)
+    local SettingsSection = SettingsTab:AddSection("System")
+    SettingsSection:AddButton("Unload Script", function()
+        pcall(function()
+            if renderConnection then renderConnection:Disconnect() end
+            adv_stop()
+            ZOV.ClearAll()
+            pcall(function() if Library and Library.Unload then Library:Unload() end end)
+            safeNotify("System","Unloaded",1)
+        end)
+    end)
+
+    Library:Notify("Ready", "Menu carregado com Esp + AdvAim + Sequestro", 3)
+end
+
+-- ===== Expose global hooks & APIs =====
+_G.MasterMenuZov = _G.MasterMenuZov or {}
+_G.MasterMenuZov.aimbotSettings = aimbotSettings
+_G.MasterMenuZov.modifyHeads = modifyHeads
+_G.MasterMenuZov.PlayerUtils = PlayerUtils
+_G.MasterMenuZov.ZOV = ZOV
+_G.MasterMenuZov.enableESP = function() S.Enabled = true; ZOV.CreateAll() end
+_G.MasterMenuZov.disableESP = function() S.Enabled = false; ZOV.ClearAll() end
+_G.MasterMenuZov.destroy = function() pcall(function() if renderConnection then renderConnection:Disconnect() end; if DrawingCircle then pcall(function() DrawingCircle:Remove() end) end; if _G.MasterMenuZov.disableESP then pcall(function() _G.MasterMenuZov.disableESP() end) end end) end
+
+_G.AdvAim = _G.AdvAim or {}
+_G.AdvAim.CONFIG = ADV.CONFIG
+_G.AdvAim.Start = adv_start
+_G.AdvAim.Stop = adv_stop
+_G.AdvAim.IsRunning = function() return adv_running end
+_G.AdvAim.ListIgnored = _G.AdvAim.ListIgnored
+
+print("Master Menu + Ultra Clean ZOV integrated. AdvAim (Risco) + Sequestro loaded.")
