@@ -9,7 +9,7 @@ local velocidadeVoo = 110
 
 -- Posições fixas
 local lugar1Pos = Vector3.new(3412, 4, 2229)
-local lugarEspecialPos = Vector3.new(3495, 4, 2394)
+local lugarEspecialPos = Vector3.new(3494.135742, 4.284453, 2400.18554)
 local lugar3Pos = Vector3.new(3475, 4, 2277)
 local novoLugarPos = Vector3.new(3326, 4, 2229)
 
