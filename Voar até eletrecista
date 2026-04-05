@@ -1,0 +1,206 @@
+--[[
+    LocalScript: AutoRotas (Otimizado)
+    Descrição: Percorre pontos definidos com sistema de noclip ativo durante o voo.
+    Ajuste: Corrigida sintaxe na tabela de cframes e estabilidade de chegada.
+--]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local ScriptContext = cloneref and cloneref(game:GetService("ScriptContext")) or game:GetService("ScriptContext")
+
+local player = Players.LocalPlayer
+local playerName = player and player.Name or "Unknown"
+local loopAtivo = true
+local utility = {}
+local VELOCIDADE_FIXA = 700
+
+-- Tecla F alterna o loop
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.F then
+        loopAtivo = not loopAtivo
+        warn("AutoRotas " .. (loopAtivo and "ativado" or "desativado"))
+    end
+end)
+
+function utility.CalculatePosition(target)
+    if typeof(target) == "Vector3" then return CFrame.new(target)
+    elseif typeof(target) == "CFrame" then return target
+    elseif typeof(target) == "Instance" then
+        if target:IsA("Model") then
+            local part = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+            if part then return part.CFrame end
+        elseif target:IsA("BasePart") then return target.CFrame end
+    end
+    return CFrame.new(0, 0, 0)
+end
+
+function utility.TweenModel(model, destinationCFrame)
+    if not model or not (model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")) then return end
+    local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+    model.PrimaryPart = primary
+
+    local startCFrame = primary.CFrame
+    local distance = (startCFrame.Position - destinationCFrame.Position).Magnitude
+    local duration = distance / VELOCIDADE_FIXA
+
+    local AngularClient = Instance.new("BindableEvent")
+    utility._lastComplete = AngularClient
+
+    local startTime = tick()
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        local alpha = math.clamp((now - startTime) / duration, 0, 1)
+        local cf = startCFrame:Lerp(destinationCFrame, alpha)
+        
+        model:SetPrimaryPartCFrame(cf)
+        
+        if alpha >= 1 then
+            conn:Disconnect()
+            if utility._lastComplete then
+                utility._lastComplete:Fire()
+                utility._lastComplete:Destroy()
+                utility._lastComplete = nil
+            end
+        end
+    end)
+end
+
+function utility.TweenModelCompletedWait()
+    if utility._lastComplete then utility._lastComplete.Event:Wait() end
+end
+
+function utility.findVehicle()
+    local folder = workspace:FindFirstChild("CarrosSpawnados")
+    if not folder then return nil end
+    for _, v in ipairs(folder:GetChildren()) do
+        local info = v:FindFirstChild("Info")
+        local owner = info and info:FindFirstChild("Owner")
+        if owner and owner.Value == player.Name then return v end
+    end
+    return nil
+end
+
+function utility.SetTweenVehicle(CFrameDestination)
+    local vehicle = utility.findVehicle()
+    if not vehicle then return false end
+    
+    local targetCF = utility.CalculatePosition(CFrameDestination)
+    
+    -- === INICIA NOCLIP (Voo) ===
+    local oldCollisionStates = {}
+    for _, p in pairs(vehicle:GetDescendants()) do
+        if p:IsA("BasePart") then
+            oldCollisionStates[p] = p.CanCollide
+            p.CanCollide = false
+            p.AssemblyLinearVelocity = Vector3.zero
+            p.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+
+    utility.TweenModel(vehicle, targetCF)
+    utility.TweenModelCompletedWait()
+
+    task.wait(0.1)
+
+    -- === FINALIZA NOCLIP (Chegada) ===
+    for part, state in pairs(oldCollisionStates) do
+        if part and part.Parent then
+            part.CanCollide = state
+            part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+    
+    return true
+end
+
+function utility.InteragirProximidades(targetPosition)
+    local locais = workspace:FindFirstChild("Construcoes") and workspace.Construcoes:FindFirstChild("LocaisRotas")
+    if not locais then return end
+    for _, prompt in ipairs(locais:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") and prompt.Parent:IsA("BasePart") then
+            if (prompt.Parent.Position - targetPosition).Magnitude <= 35 then
+                task.wait(0.3)
+                fireproximityprompt(prompt, true)
+                task.wait((prompt.HoldDuration or 0.5) + 0.2)
+                fireproximityprompt(prompt, false)
+            end
+        end
+    end
+end
+
+-- Configurações de Pontos
+local pontosFalsos = {
+    CFrame.new(4177, 39, 2611),
+    
+}
+
+local cframes = {
+    CFrame.new(3395.010498046875, 8.593533515930176, 2292.13134765625) -- Corrigido: Removida vírgula extra
+}
+
+-- Loop Principal (Executa apenas 1 vez)
+coroutine.wrap(function()
+    if loopAtivo then
+        for i, cf in ipairs(cframes) do
+            if not loopAtivo then break end
+            
+            -- Desvio de segurança (Ponto Falso)
+            utility.SetTweenVehicle(pontosFalsos[math.random(1, #pontosFalsos)])
+            task.wait(1.5)
+            
+            -- Movimento para o Ponto Real
+            if utility.SetTweenVehicle(cf) then
+                utility.InteragirProximidades(cf.Position)
+                print("Status: Ponto " .. i .. " finalizado.")
+                task.wait(3)
+            end
+        end
+        
+        -- FINALIZAÇÃO: Desliga o sistema após percorrer todos os pontos
+        loopAtivo = false
+        warn("AutoRotas: Rota finalizada com sucesso. Sistema desligado.")
+    end
+end)()
+
+
+-- Limpeza de Mapa e Proteções
+local function limparMapa()
+    local comp = workspace:FindFirstChild("Complementos")
+    if comp then
+        pcall(function()
+            if comp:FindFirstChild("Aguas") then comp.Aguas:Destroy() end
+            if comp:FindFirstChild("Areias") then comp.Areias:Destroy() end
+        end)
+    end
+end
+limparMapa()
+
+local function setupProtections()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hum = char:WaitForChild("Humanoid")
+    
+    hum.Jumping:Connect(function()
+        if loopAtivo then
+            loopAtivo = false
+            warn("Sistema pausado: Pulo detectado.")
+        end
+    end)
+    
+    task.spawn(function()
+        while char and char.Parent do
+            if loopAtivo and not hum.Sit then
+                loopAtivo = false
+                warn("Sistema pausado: Jogador levantou do banco.")
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+setupProtections()
+player.CharacterAdded:Connect(setupProtections)
+
+return utility
