@@ -1,206 +1,256 @@
---[[
-    LocalScript: AutoRotas (Otimizado)
-    Descrição: Percorre pontos definidos com sistema de noclip ativo durante o voo.
-    Ajuste: Corrigida sintaxe na tabela de cframes e estabilidade de chegada.
---]]
+--[[ 
+AutoRotas SUPER BLINDADO
+]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local TeleportService = game:GetService("TeleportService")
-local ScriptContext = cloneref and cloneref(game:GetService("ScriptContext")) or game:GetService("ScriptContext")
 
 local player = Players.LocalPlayer
-local playerName = player and player.Name or "Unknown"
-local loopAtivo = true
-local utility = {}
-local VELOCIDADE_FIXA = 700
+if not player then return end
 
--- Tecla F alterna o loop
+local loopAtivo = true
+local VELOCIDADE_FIXA = 700
+local utility = {}
+
+-- 🛑 ERRO FATAL
+local function erroFatal(msg)
+    player:Kick("❌ ERRO:\n"..msg)
+    error(msg)
+end
+
+-- 🎮 TOGGLE
 UserInputService.InputBegan:Connect(function(input, processed)
     if not processed and input.KeyCode == Enum.KeyCode.F then
         loopAtivo = not loopAtivo
-        warn("AutoRotas " .. (loopAtivo and "ativado" or "desativado"))
+        warn("AutoRotas "..(loopAtivo and "ON" or "OFF"))
     end
 end)
 
+-- 🔍 VALIDAR CF
 function utility.CalculatePosition(target)
-    if typeof(target) == "Vector3" then return CFrame.new(target)
-    elseif typeof(target) == "CFrame" then return target
-    elseif typeof(target) == "Instance" then
-        if target:IsA("Model") then
-            local part = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
-            if part then return part.CFrame end
-        elseif target:IsA("BasePart") then return target.CFrame end
-    end
-    return CFrame.new(0, 0, 0)
-end
-
-function utility.TweenModel(model, destinationCFrame)
-    if not model or not (model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")) then return end
-    local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-    model.PrimaryPart = primary
-
-    local startCFrame = primary.CFrame
-    local distance = (startCFrame.Position - destinationCFrame.Position).Magnitude
-    local duration = distance / VELOCIDADE_FIXA
-
-    local AngularClient = Instance.new("BindableEvent")
-    utility._lastComplete = AngularClient
-
-    local startTime = tick()
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
-        local now = tick()
-        local alpha = math.clamp((now - startTime) / duration, 0, 1)
-        local cf = startCFrame:Lerp(destinationCFrame, alpha)
-        
-        model:SetPrimaryPartCFrame(cf)
-        
-        if alpha >= 1 then
-            conn:Disconnect()
-            if utility._lastComplete then
-                utility._lastComplete:Fire()
-                utility._lastComplete:Destroy()
-                utility._lastComplete = nil
+    local ok, result = pcall(function()
+        if typeof(target) == "Vector3" then
+            return CFrame.new(target)
+        elseif typeof(target) == "CFrame" then
+            return target
+        elseif typeof(target) == "Instance" then
+            if target:IsA("Model") then
+                local part = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+                if part then return part.CFrame end
+            elseif target:IsA("BasePart") then
+                return target.CFrame
             end
         end
+        return CFrame.new(0,0,0)
     end)
+
+    if not ok then erroFatal("Erro ao calcular posição") end
+    return result
 end
 
-function utility.TweenModelCompletedWait()
-    if utility._lastComplete then utility._lastComplete.Event:Wait() end
-end
-
+-- 🚗 ENCONTRAR VEÍCULO
 function utility.findVehicle()
     local folder = workspace:FindFirstChild("CarrosSpawnados")
-    if not folder then return nil end
+    if not folder then erroFatal("CarrosSpawnados não encontrado") end
+
     for _, v in ipairs(folder:GetChildren()) do
         local info = v:FindFirstChild("Info")
         local owner = info and info:FindFirstChild("Owner")
-        if owner and owner.Value == player.Name then return v end
+        if owner and owner.Value == player.Name then
+            return v
+        end
+    end
+
+    erroFatal("Veículo não encontrado")
+end
+
+-- 🔧 GARANTIR PRIMARY
+local function ensurePrimary(model)
+    if model.PrimaryPart then return model.PrimaryPart end
+    local part = model:FindFirstChildWhichIsA("BasePart", true)
+    if part then
+        model.PrimaryPart = part
+        return part
     end
     return nil
 end
 
-function utility.SetTweenVehicle(CFrameDestination)
+-- ✈️ TWEEN SEGURO
+function utility.TweenModel(model, dest)
+    local primary = ensurePrimary(model)
+    if not primary then erroFatal("PrimaryPart inválido") end
+
+    local start = primary.CFrame
+    local dist = (start.Position - dest.Position).Magnitude
+
+    if dist == 0 then return true end
+
+    local duration = math.max(dist / VELOCIDADE_FIXA, 0.05)
+    local startTime = tick()
+
+    local finished = false
+    local timeout = tick() + duration + 5
+
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        local ok, err = pcall(function()
+            if not model or not model.Parent then
+                error("Modelo destruído")
+            end
+
+            local alpha = math.clamp((tick() - startTime) / duration, 0, 1)
+            local cf = start:Lerp(dest, alpha)
+
+            model:PivotTo(cf)
+
+            if alpha >= 1 then
+                finished = true
+                conn:Disconnect()
+                model:PivotTo(dest)
+            end
+        end)
+
+        if not ok then
+            conn:Disconnect()
+            erroFatal("Erro no Tween: "..tostring(err))
+        end
+    end)
+
+    while not finished do
+        if tick() > timeout then
+            if conn then conn:Disconnect() end
+            erroFatal("Timeout no movimento")
+        end
+        task.wait()
+    end
+
+    return true
+end
+
+-- 🚗 MOVER VEÍCULO
+function utility.SetTweenVehicle(dest)
     local vehicle = utility.findVehicle()
-    if not vehicle then return false end
-    
-    local targetCF = utility.CalculatePosition(CFrameDestination)
-    
-    -- === INICIA NOCLIP (Voo) ===
-    local oldCollisionStates = {}
-    for _, p in pairs(vehicle:GetDescendants()) do
+    local targetCF = utility.CalculatePosition(dest)
+
+    local old = {}
+
+    for _, p in ipairs(vehicle:GetDescendants()) do
         if p:IsA("BasePart") then
-            oldCollisionStates[p] = p.CanCollide
+            old[p] = p.CanCollide
             p.CanCollide = false
             p.AssemblyLinearVelocity = Vector3.zero
             p.AssemblyAngularVelocity = Vector3.zero
         end
     end
 
-    utility.TweenModel(vehicle, targetCF)
-    utility.TweenModelCompletedWait()
+    local ok, err = pcall(function()
+        utility.TweenModel(vehicle, targetCF)
+    end)
 
-    task.wait(0.1)
-
-    -- === FINALIZA NOCLIP (Chegada) ===
-    for part, state in pairs(oldCollisionStates) do
+    for part, state in pairs(old) do
         if part and part.Parent then
             part.CanCollide = state
-            part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
         end
     end
-    
+
+    if not ok then
+        erroFatal("Falha ao mover veículo: "..tostring(err))
+    end
+
     return true
 end
 
-function utility.InteragirProximidades(targetPosition)
-    local locais = workspace:FindFirstChild("Construcoes") and workspace.Construcoes:FindFirstChild("LocaisRotas")
+-- 🤖 PROMPT SEGURO
+function utility.InteragirProximidades(pos)
+    local locais = workspace:FindFirstChild("Construcoes")
+    locais = locais and locais:FindFirstChild("LocaisRotas")
+
     if not locais then return end
+
     for _, prompt in ipairs(locais:GetDescendants()) do
-        if prompt:IsA("ProximityPrompt") and prompt.Parent:IsA("BasePart") then
-            if (prompt.Parent.Position - targetPosition).Magnitude <= 35 then
-                task.wait(0.3)
-                fireproximityprompt(prompt, true)
-                task.wait((prompt.HoldDuration or 0.5) + 0.2)
-                fireproximityprompt(prompt, false)
+        if prompt:IsA("ProximityPrompt") then
+            local parent = prompt.Parent
+            if parent and parent:IsA("BasePart") then
+                if (parent.Position - pos).Magnitude <= 35 then
+                    pcall(function()
+                        if fireproximityprompt then
+                            fireproximityprompt(prompt)
+                        else
+                            prompt:InputHoldBegin()
+                            task.wait(prompt.HoldDuration + 0.1)
+                            prompt:InputHoldEnd()
+                        end
+                    end)
+                end
             end
         end
     end
 end
 
--- Configurações de Pontos
+-- 📍 PONTOS
 local pontosFalsos = {
-    CFrame.new(4177, 39, 2611),
-    
+    CFrame.new(4177, 39, 2611)
 }
 
 local cframes = {
-    CFrame.new(3395.010498046875, 8.593533515930176, 2292.13134765625) -- Corrigido: Removida vírgula extra
+    CFrame.new(3614.98, 5.19, 1939.57)
 }
 
--- Loop Principal (Executa apenas 1 vez)
-coroutine.wrap(function()
-    if loopAtivo then
-        for i, cf in ipairs(cframes) do
-            if not loopAtivo then break end
-            
-            -- Desvio de segurança (Ponto Falso)
-            utility.SetTweenVehicle(pontosFalsos[math.random(1, #pontosFalsos)])
-            task.wait(1.5)
-            
-            -- Movimento para o Ponto Real
+-- 🚀 LOOP PRINCIPAL
+task.spawn(function()
+    if not loopAtivo then return end
+
+    for i, cf in ipairs(cframes) do
+        if not loopAtivo then break end
+
+        pcall(function()
+            utility.SetTweenVehicle(pontosFalsos[1])
+            task.wait(1)
+
             if utility.SetTweenVehicle(cf) then
                 utility.InteragirProximidades(cf.Position)
-                print("Status: Ponto " .. i .. " finalizado.")
-                task.wait(3)
+                print("✔ Ponto "..i.." completo")
+                task.wait(2)
             end
-        end
-        
-        -- FINALIZAÇÃO: Desliga o sistema após percorrer todos os pontos
-        loopAtivo = false
-        warn("AutoRotas: Rota finalizada com sucesso. Sistema desligado.")
-    end
-end)()
-
-
--- Limpeza de Mapa e Proteções
-local function limparMapa()
-    local comp = workspace:FindFirstChild("Complementos")
-    if comp then
-        pcall(function()
-            if comp:FindFirstChild("Aguas") then comp.Aguas:Destroy() end
-            if comp:FindFirstChild("Areias") then comp.Areias:Destroy() end
         end)
     end
-end
-limparMapa()
 
-local function setupProtections()
+    loopAtivo = false
+    warn("🏁 Rota finalizada")
+end)
+
+-- 🧹 LIMPEZA
+pcall(function()
+    local comp = workspace:FindFirstChild("Complementos")
+    if comp then
+        if comp:FindFirstChild("Aguas") then comp.Aguas:Destroy() end
+        if comp:FindFirstChild("Areias") then comp.Areias:Destroy() end
+    end
+end)
+
+-- 🛡️ PROTEÇÃO
+local function setup()
     local char = player.Character or player.CharacterAdded:Wait()
     local hum = char:WaitForChild("Humanoid")
-    
+
     hum.Jumping:Connect(function()
         if loopAtivo then
             loopAtivo = false
-            warn("Sistema pausado: Pulo detectado.")
+            warn("⛔ Parado: pulou")
         end
     end)
-    
+
     task.spawn(function()
-        while char and char.Parent do
+        while char.Parent do
             if loopAtivo and not hum.Sit then
                 loopAtivo = false
-                warn("Sistema pausado: Jogador levantou do banco.")
+                warn("⛔ Parado: saiu do banco")
             end
             task.wait(1)
         end
     end)
 end
 
-setupProtections()
-player.CharacterAdded:Connect(setupProtections)
-
-return utility
+setup()
+player.CharacterAdded:Connect(setup)
