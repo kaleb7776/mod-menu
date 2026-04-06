@@ -1,4 +1,4 @@
--- Auto Eletricista V11.1 (FIX: delay 5s + sem duplo prompt)
+-- Auto Eletricista V12 (PERFEITO - SEM FALHAS SILENCIOSAS)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,22 +8,37 @@ local player = Players.LocalPlayer
 local autoFarm = false
 
 local CONFIG = {
-    VELOCIDADE_VOO = 150
+    VELOCIDADE_VOO = 150,
+    TEMPO_MAX_VOO = 30
 }
 
--- ROOT
+-- ROOT SEGURO
 local function getRoot()
     local char = player.Character or player.CharacterAdded:Wait()
-    return char:WaitForChild("HumanoidRootPart", 10)
+    local root = char:WaitForChild("HumanoidRootPart", 10)
+    if not root then
+        player:Kick("❌ Root não encontrado")
+    end
+    return root
 end
 
--- PROMPT (ANTI DUPLO)
+-- PROMPT (ANTI BUG + GARANTIDO)
 local ultimoUso = 0
-local function usarPrompt(prompt)
-    if not prompt then return false end
+local function usarPromptSeguro(obj)
+    if not obj then
+        player:Kick("❌ Objeto do prompt nil")
+        return false
+    end
 
-    -- evita spam
-    if tick() - ultimoUso < 0.8 then return false end
+    local prompt = obj:FindFirstChildOfClass("ProximityPrompt")
+    if not prompt then
+        player:Kick("❌ Prompt não encontrado em "..obj.Name)
+        return false
+    end
+
+    if tick() - ultimoUso < 0.7 then
+        task.wait(0.3)
+    end
     ultimoUso = tick()
 
     local ok = pcall(function()
@@ -38,37 +53,53 @@ local function usarPrompt(prompt)
         end)
     end
 
-    return ok
+    if not ok then
+        player:Kick("❌ Falha ao usar prompt")
+    end
+
+    return true
 end
 
--- TECLA 1
+-- TECLA 1 SEGURA
 local function apertar1()
-    pcall(function()
+    local ok = pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
         task.wait(0.1)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
     end)
+
+    if not ok then
+        player:Kick("❌ Falha ao apertar tecla 1")
+    end
 end
 
--- VOO
+-- VOO PERFEITO
 local function voarAte(pos)
     local root = getRoot()
-    if not root then return false end
-
     local tempoInicio = tick()
 
-    while (Vector3.new(root.Position.X,0,root.Position.Z) - Vector3.new(pos.X,0,pos.Z)).Magnitude > 3 do
+    while true do
         if not autoFarm then return false end
-        if tick() - tempoInicio > 30 then return false end
+
+        local dist = (Vector3.new(root.Position.X,0,root.Position.Z) - Vector3.new(pos.X,0,pos.Z)).Magnitude
+        if dist <= 3 then break end
+
+        if tick() - tempoInicio > CONFIG.TEMPO_MAX_VOO then
+            player:Kick("❌ Tempo de voo excedido")
+        end
 
         local dt = RunService.Heartbeat:Wait()
+        local currentPos = root.Position
 
-        local dir = (Vector3.new(pos.X,0,pos.Z) - Vector3.new(root.Position.X,0,root.Position.Z)).Unit
+        local diff = Vector3.new(pos.X,0,pos.Z) - Vector3.new(currentPos.X,0,currentPos.Z)
+        if diff.Magnitude < 0.1 then break end
+
+        local dir = diff.Unit
 
         local novaXZ = Vector3.new(
-            root.Position.X + dir.X * CONFIG.VELOCIDADE_VOO * dt,
+            currentPos.X + dir.X * CONFIG.VELOCIDADE_VOO * dt,
             0,
-            root.Position.Z + dir.Z * CONFIG.VELOCIDADE_VOO * dt
+            currentPos.Z + dir.Z * CONFIG.VELOCIDADE_VOO * dt
         )
 
         local rayParams = RaycastParams.new()
@@ -76,80 +107,95 @@ local function voarAte(pos)
         rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
         local result = workspace:Raycast(
-            Vector3.new(novaXZ.X, root.Position.Y + 50, novaXZ.Z),
+            Vector3.new(novaXZ.X, currentPos.Y + 50, novaXZ.Z),
             Vector3.new(0, -200, 0),
             rayParams
         )
 
-        local y = result and (result.Position.Y + 3) or root.Position.Y
+        local y = result and (result.Position.Y + 3) or currentPos.Y
         root.CFrame = CFrame.new(novaXZ.X, y, novaXZ.Z)
     end
 
     return true
 end
 
--- PATHS
+-- PEGAR PATHS SEGURO + ORDEM FIXA
 local function getPaths()
-    local escada = workspace:WaitForChild("CarrosSpawnados"):WaitForChild("Eletricista")
-        :WaitForChild("Body"):WaitForChild("Escada"):WaitForChild("Proxy")
+    local escada = workspace:WaitForChild("CarrosSpawnados",10)
+        :WaitForChild("Eletricista",10)
+        :WaitForChild("Body",10)
+        :WaitForChild("Escada",10)
+        :WaitForChild("Proxy",10)
 
-    local postes = workspace:WaitForChild("Complementos"):WaitForChild("Postes"):GetChildren()
+    if not escada then
+        player:Kick("❌ Escada não encontrada")
+    end
+
+    local pasta = workspace:WaitForChild("Complementos",10):WaitForChild("Postes",10)
+    local postes = pasta:GetChildren()
+
+    -- ORDEM FIXA (CRÍTICO)
+    table.sort(postes, function(a,b)
+        return a.Name < b.Name
+    end)
+
+    if #postes < 33 then
+        player:Kick("❌ Postes insuficientes")
+    end
 
     return escada, postes
 end
 
--- EXECUTAR POSTE
+-- EXECUTAR POSTE (VALIDAÇÃO TOTAL)
 local function fazerPoste(index, escada, postes)
     local poste = postes[index]
-    if not poste then return false end
+    if not poste then
+        player:Kick("❌ Poste "..index.." não existe")
+    end
 
     local prox = poste:FindFirstChild("proxymiti")
     local real = poste:FindFirstChild("Poste")
 
+    if not prox or not real then
+        player:Kick("❌ Estrutura do poste inválida")
+    end
+
     task.wait(1)
 
     -- ESCADA
-    voarAte(escada.Position)
+    if not voarAte(escada.Position) then return end
     task.wait(1)
-    usarPrompt(escada:FindFirstChildOfClass("ProximityPrompt"))
+    usarPromptSeguro(escada)
     apertar1()
 
     task.wait(1)
 
     -- PROXY
-    if prox then
-        voarAte(prox.Position)
-        task.wait(1)
-        usarPrompt(prox:FindFirstChildOfClass("ProximityPrompt"))
-    end
+    if not voarAte(prox.Position) then return end
+    task.wait(1)
+    usarPromptSeguro(prox)
 
     task.wait(1)
 
     -- POSTE
-    if real then
-        voarAte(real.Position)
-        task.wait(0.5)
-        usarPrompt(real:FindFirstChildOfClass("ProximityPrompt"))
-    end
+    if not voarAte(real.Position) then return end
+    task.wait(0.5)
+    usarPromptSeguro(real)
 
     task.wait(1)
 
     -- VOLTA PROXY
-    if prox then
-        voarAte(prox.Position)
-    end
-
+    if not voarAte(prox.Position) then return end
     task.wait(0.5)
 
-    -- VOLTA ESCADA (SEM DUPLICAR)
-    voarAte(escada.Position)
+    -- VOLTA ESCADA
+    if not voarAte(escada.Position) then return end
     task.wait(1)
-    usarPrompt(escada:FindFirstChildOfClass("ProximityPrompt"))
-
+    usarPromptSeguro(escada)
     apertar1()
 end
 
--- LOOP
+-- LOOP PERFEITO
 local function loop()
     local escada, postes = getPaths()
 
@@ -167,19 +213,17 @@ local function loop()
         end)
 
         if not ok then
-            warn("Erro:", err)
-            player:Kick("❌ Erro crítico")
+            player:Kick("❌ Erro crítico: "..tostring(err))
             break
         end
 
-        -- ⏱️ ESPERA 5 SEGUNDOS ANTES DE RECOMEÇAR
         task.wait(5)
     end
 end
 
 -- TOGGLE
 if AutoSection and AutoSection.AddToggle then
-    AutoSection:AddToggle("Auto Eletricista V11.1", false, nil, function(state)
+    AutoSection:AddToggle("Auto Eletricista V12", false, nil, function(state)
         autoFarm = state
         if state then
             task.spawn(loop)
