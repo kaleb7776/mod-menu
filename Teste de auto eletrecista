@@ -1,0 +1,191 @@
+-- Auto Eletricista V11.1 (FIX: delay 5s + sem duplo prompt)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+
+local autoFarm = false
+
+local CONFIG = {
+    VELOCIDADE_VOO = 150
+}
+
+-- ROOT
+local function getRoot()
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart", 10)
+end
+
+-- PROMPT (ANTI DUPLO)
+local ultimoUso = 0
+local function usarPrompt(prompt)
+    if not prompt then return false end
+
+    -- evita spam
+    if tick() - ultimoUso < 0.8 then return false end
+    ultimoUso = tick()
+
+    local ok = pcall(function()
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration + 0.1)
+        prompt:InputHoldEnd()
+    end)
+
+    if fireproximityprompt then
+        pcall(function()
+            fireproximityprompt(prompt)
+        end)
+    end
+
+    return ok
+end
+
+-- TECLA 1
+local function apertar1()
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+        task.wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+    end)
+end
+
+-- VOO
+local function voarAte(pos)
+    local root = getRoot()
+    if not root then return false end
+
+    local tempoInicio = tick()
+
+    while (Vector3.new(root.Position.X,0,root.Position.Z) - Vector3.new(pos.X,0,pos.Z)).Magnitude > 3 do
+        if not autoFarm then return false end
+        if tick() - tempoInicio > 30 then return false end
+
+        local dt = RunService.Heartbeat:Wait()
+
+        local dir = (Vector3.new(pos.X,0,pos.Z) - Vector3.new(root.Position.X,0,root.Position.Z)).Unit
+
+        local novaXZ = Vector3.new(
+            root.Position.X + dir.X * CONFIG.VELOCIDADE_VOO * dt,
+            0,
+            root.Position.Z + dir.Z * CONFIG.VELOCIDADE_VOO * dt
+        )
+
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {player.Character}
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+        local result = workspace:Raycast(
+            Vector3.new(novaXZ.X, root.Position.Y + 50, novaXZ.Z),
+            Vector3.new(0, -200, 0),
+            rayParams
+        )
+
+        local y = result and (result.Position.Y + 3) or root.Position.Y
+        root.CFrame = CFrame.new(novaXZ.X, y, novaXZ.Z)
+    end
+
+    return true
+end
+
+-- PATHS
+local function getPaths()
+    local escada = workspace:WaitForChild("CarrosSpawnados"):WaitForChild("Eletricista")
+        :WaitForChild("Body"):WaitForChild("Escada"):WaitForChild("Proxy")
+
+    local postes = workspace:WaitForChild("Complementos"):WaitForChild("Postes"):GetChildren()
+
+    return escada, postes
+end
+
+-- EXECUTAR POSTE
+local function fazerPoste(index, escada, postes)
+    local poste = postes[index]
+    if not poste then return false end
+
+    local prox = poste:FindFirstChild("proxymiti")
+    local real = poste:FindFirstChild("Poste")
+
+    task.wait(1)
+
+    -- ESCADA
+    voarAte(escada.Position)
+    task.wait(1)
+    usarPrompt(escada:FindFirstChildOfClass("ProximityPrompt"))
+    apertar1()
+
+    task.wait(1)
+
+    -- PROXY
+    if prox then
+        voarAte(prox.Position)
+        task.wait(1)
+        usarPrompt(prox:FindFirstChildOfClass("ProximityPrompt"))
+    end
+
+    task.wait(1)
+
+    -- POSTE
+    if real then
+        voarAte(real.Position)
+        task.wait(0.5)
+        usarPrompt(real:FindFirstChildOfClass("ProximityPrompt"))
+    end
+
+    task.wait(1)
+
+    -- VOLTA PROXY
+    if prox then
+        voarAte(prox.Position)
+    end
+
+    task.wait(0.5)
+
+    -- VOLTA ESCADA (SEM DUPLICAR)
+    voarAte(escada.Position)
+    task.wait(1)
+    usarPrompt(escada:FindFirstChildOfClass("ProximityPrompt"))
+
+    apertar1()
+end
+
+-- LOOP
+local function loop()
+    local escada, postes = getPaths()
+
+    while autoFarm do
+        local ok, err = pcall(function()
+
+            fazerPoste(31, escada, postes)
+            task.wait(1)
+
+            fazerPoste(32, escada, postes)
+            task.wait(1)
+
+            fazerPoste(33, escada, postes)
+
+        end)
+
+        if not ok then
+            warn("Erro:", err)
+            player:Kick("❌ Erro crítico")
+            break
+        end
+
+        -- ⏱️ ESPERA 5 SEGUNDOS ANTES DE RECOMEÇAR
+        task.wait(5)
+    end
+end
+
+-- TOGGLE
+if AutoSection and AutoSection.AddToggle then
+    AutoSection:AddToggle("Auto Eletricista V11.1", false, nil, function(state)
+        autoFarm = state
+        if state then
+            task.spawn(loop)
+        end
+    end)
+else
+    autoFarm = true
+    task.spawn(loop)
+end
