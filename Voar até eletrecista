@@ -194,7 +194,7 @@ local pontosFalsos = {
 }
 
 local cframes = {
-    CFrame.new(3602.880859375, 9.448941230773926, 2898.603759765625)
+    CFrame.new(3395.02001953125, 10.31126880645752, 2291.88623046875)
 }
 
 -- 🚀 LOOP PRINCIPAL
