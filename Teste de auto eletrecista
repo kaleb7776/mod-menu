@@ -110,5 +110,5 @@ while true do
     voarAte(poste29.proxymiti.Position)
 
     print("Ciclo concluído. Reiniciando em 8s...")
-    task.wait(22) 
+    task.wait(12) 
 end
