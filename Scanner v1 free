@@ -243,17 +243,11 @@ ladb_instant_mdns() {
   # =========================
   # IP AUTOMÁTICO
   # =========================
-  local ip
-  ip="$(ip route 2>/dev/null | awk '/wlan0/ {print $9}' | head -n1)"
-
-  [ -z "$ip" ] && {
-    msg "IP não detectado" "$RED"
-    return
-  }
-
-  msg "IP detectado: $ip" "$GRN"
-
-  # =========================
+  ip="$(getprop dhcp.wlan0.ipaddress)"
+[ -z "$ip" ] && ip="$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7; exit}')"
+[ -z "$ip" ] && ip="$(ifconfig wlan0 2>/dev/null | awk '/inet / {print $2}')"
+[ -z "$ip" ] && ip="0.0.0.0"
+# =========================
   # INPUT DE PAREAMENTO
   # =========================
   printf 'Porta de pareamento: '
