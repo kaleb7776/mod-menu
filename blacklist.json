@@ -6,5 +6,12 @@
       "reason": "suspected replay abuse",
       "permanent_ban": true
     }
+    
+{
+  "fingerprint": "237a21f4712d31f979ae2d169ae16e56",
+  "org": "chefe",
+  "reason": "PASSADOR DE REPLAY",
+  "permanent_ban": true
+}
   ]
 }
