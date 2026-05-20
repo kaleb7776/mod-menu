@@ -1,7 +1,7 @@
 {
   "devices": [
     {
-      "fingerprint": "a1b2c3d4e5",
+      "fingerprint": "237a21f4712d31f979ae2d169ae16e56",
       "org": "ORG_ALPHA",
       "reason": "suspected replay abuse",
       "permanent_ban": true
