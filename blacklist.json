@@ -1,0 +1,10 @@
+{
+  "devices": [
+    {
+      "fingerprint": "a1b2c3d4e5",
+      "org": "ORG_ALPHA",
+      "reason": "suspected replay abuse",
+      "permanent_ban": true
+    }
+  ]
+}
