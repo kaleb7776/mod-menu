@@ -2341,7 +2341,8 @@ Items["SubPagesScroll"] = Instances:Create("ScrollingFrame", {
     ScrollBarThickness = 2,
     ScrollingDirection = Enum.ScrollingDirection.X,
     CanvasSize = UDim2New(0, 0, 0, 0),
-    ScrollBarImageColor3 = Library.Theme.Accent or FromRGB(255,255,255)
+    ScrollBarImageColor3 = Library.Theme.Accent or FromRGB(255,255,255),
+ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
 })
 Items["SubPagesScroll"]:AddToTheme({ScrollBarImageColor3 = "Accent"})
 
@@ -2365,7 +2366,8 @@ Items["Columns"] = Instances:Create("Frame", {
     BorderSizePixel = 0,
     -- AutomaticSize REMOVIDO (era o causador do vazamento)
     BackgroundColor3 = FromRGB(255, 255, 255),
-    BackgroundTransparency = 1
+    BackgroundTransparency = 1,
+ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
 })
 
 Items["SubPages"]:AddToTheme({BackgroundColor3 = "Background"})
@@ -2521,7 +2523,8 @@ Library.Pages.SubPage = function(self, Data)
             BorderColor3 = FromRGB(0, 0, 0),
             Size = UDim2New(1, 0, 1, 0),
             BorderSizePixel = 0,
-            BackgroundColor3 = FromRGB(255, 255, 255)
+            BackgroundColor3 = FromRGB(255, 255, 255),
+ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
         })
 
 local NewColumn = Instances:Create("ScrollingFrame", {
