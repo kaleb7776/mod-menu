@@ -2066,7 +2066,7 @@ end
             BorderColor3 = FromRGB(0, 0, 0),
             Size = UDim2New(1, -226, 1, -12),
             BorderSizePixel = 0,
-            BackgroundColor3 = FromRGB(21, 24, 24)
+            BackgroundColor3 = FromRGB(21, 24, 24),
 ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
         })  
 Items["Content"]:AddToTheme({BackgroundColor3 = "Inline"})
