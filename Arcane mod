@@ -1883,7 +1883,7 @@ Library.Window = function(self, Data)
             Size = Window.Size,
             BorderSizePixel = 0,
             BackgroundColor3 = FromRGB(16, 18, 18),
-           ClipsDescendants = true,   -- ⬅️ ADICIONE ESTA
+           ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
         })  Items["MainFrame"]:AddToTheme({BackgroundColor3 = "Background"}),
 
 
@@ -2069,7 +2069,7 @@ end
             Size = UDim2New(1, -226, 1, -12),
             BorderSizePixel = 0,
             BackgroundColor3 = FromRGB(21, 24, 24),
-ClipsDescendants = true,   -- ⬅️ ADICIONE ESTA
+ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
         })  
 Items["Content"]:AddToTheme({BackgroundColor3 = "Inline"})
         
@@ -2344,7 +2344,7 @@ Items["SubPagesScroll"] = Instances:Create("ScrollingFrame", {
     ScrollingDirection = Enum.ScrollingDirection.X,
     CanvasSize = UDim2New(0, 0, 0, 0),
     ScrollBarImageColor3 = Library.Theme.Accent or FromRGB(255,255,255),
-ClipsDescendants = true,   -- ⬅️ ADICIONE ESTA
+ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
 })
 Items["SubPagesScroll"]:AddToTheme({ScrollBarImageColor3 = "Accent"})
 
@@ -2369,7 +2369,7 @@ Items["Columns"] = Instances:Create("Frame", {
     -- AutomaticSize REMOVIDO (era o causador do vazamento)
     BackgroundColor3 = FromRGB(255, 255, 255),
     BackgroundTransparency = 1,
-ClipsDescendants = true,   -- ⬅️ ADICIONE ESTA
+ClipsDescendants = true   -- ⬅️ ADICIONE ESTA
 })
 
 Items["SubPages"]:AddToTheme({BackgroundColor3 = "Background"})
@@ -2526,7 +2526,7 @@ Library.Pages.SubPage = function(self, Data)
             Size = UDim2New(1, 0, 1, 0),
             BorderSizePixel = 0,
             BackgroundColor3 = FromRGB(255, 255, 255),
-ClipsDescendants = true,    -- ⬅️ ADICIONE ESTA
+ClipsDescendants = true    -- ⬅️ ADICIONE ESTA
         })
 
 local NewColumn = Instances:Create("ScrollingFrame", {
