@@ -2323,53 +2323,73 @@ end
                     TextSize = 18,
                     BackgroundColor3 = FromRGB(255, 255, 255)
                 })
-                
-                Items["SubPages"] = Instances:Create("Frame", {
-                    Parent = Items["Page"].Instance,
-                    Name = "\0",
-                    Size = UDim2New(0, 0, 0, 30),
-                    Position = UDim2New(0, 13, 0, 42),
-                    BorderColor3 = FromRGB(0, 0, 0),
-                    BorderSizePixel = 0,
-                    AutomaticSize = Enum.AutomaticSize.X,
-                    BackgroundColor3 = FromRGB(16, 18, 18)
-                })  Items["SubPages"]:AddToTheme({BackgroundColor3 = "Background"})
-                
-                Instances:Create("UIPadding", {
-                    Parent = Items["SubPages"].Instance,
-                    Name = "\0",
-                    PaddingTop = UDimNew(0, 2),
-                    PaddingBottom = UDimNew(0, 2),
-                    PaddingRight = UDimNew(0, 2),
-                    PaddingLeft = UDimNew(0, 2)
-                })
-                
-                Instances:Create("UIListLayout", {
-                    Parent = Items["SubPages"].Instance,
-                    Name = "\0",
-                    Padding = UDimNew(0, 2),
-                    FillDirection = Enum.FillDirection.Horizontal,
-                    SortOrder = Enum.SortOrder.LayoutOrder
-                })
 
-                Instances:Create("UICorner", {
-                    Parent = Items["SubPages"].Instance,
-                    Name = "\0",
-                    CornerRadius = UDimNew(0, 7)
-                })                
+-- Container com scroll horizontal para as abas
+Items["SubPagesScroll"] = Instances:Create("ScrollingFrame", {
+    Parent = Items["Page"].Instance,
+    Name = "\0",
+    Size = UDim2New(1, -26, 0, 30),          -- ocupa toda a largura disponível
+    Position = UDim2New(0, 13, 0, 42),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 2,
+    ScrollingDirection = Enum.ScrollingDirection.X,
+    CanvasSize = UDim2New(0, 0, 0, 0),
+    ScrollBarImageColor3 = Library.Theme.Accent or FromRGB(255,255,255)
+})
+Items["SubPagesScroll"]:AddToTheme({ScrollBarImageColor3 = "Accent"})
 
-                Items["Columns"] = Instances:Create("Frame", {
-                    Parent = Items["Page"].Instance,
-                    Name = "\0",
-                    Size = UDim2New(1, -20, 1, -82),
-                    Position = UDim2New(0, 10, 0, 75),
-                    BorderColor3 = FromRGB(0, 0, 0),
-                    BorderSizePixel = 0,
-                    AutomaticSize = Enum.AutomaticSize.X,
-                    BackgroundColor3 = FromRGB(255, 255, 255),
-                    BackgroundTransparency = 1
-                })  
+-- Frame que realmente conterá os botões (dentro do scroll)
 
+Items["SubPages"] = Instances:Create("Frame", {
+    Parent = Items["SubPagesScroll"].Instance,
+    Name = "\0",
+    Size = UDim2New(0, 0, 1, 0),
+    BackgroundColor3 = FromRGB(16, 18, 18),
+    BorderColor3 = FromRGB(0, 0, 0),
+    BorderSizePixel = 0
+})
+
+Items["Columns"] = Instances:Create("Frame", {
+    Parent = Items["Page"].Instance,
+    Name = "\0",
+    Size = UDim2New(1, -20, 1, -82),
+    Position = UDim2New(0, 10, 0, 75),
+    BorderColor3 = FromRGB(0, 0, 0),
+    BorderSizePixel = 0,
+    -- AutomaticSize REMOVIDO (era o causador do vazamento)
+    BackgroundColor3 = FromRGB(255, 255, 255),
+    BackgroundTransparency = 1
+})
+
+Items["SubPages"]:AddToTheme({BackgroundColor3 = "Background"})
+
+Instances:Create("UIPadding", {
+    Parent = Items["SubPages"].Instance,
+    PaddingTop = UDimNew(0, 2),
+    PaddingBottom = UDimNew(0, 2),
+    PaddingRight = UDimNew(0, 2),
+    PaddingLeft = UDimNew(0, 2)
+})
+
+Instances:Create("UIListLayout", {
+    Parent = Items["SubPages"].Instance,
+    Padding = UDimNew(0, 2),
+    FillDirection = Enum.FillDirection.Horizontal,
+    SortOrder = Enum.SortOrder.LayoutOrder
+})
+
+Instances:Create("UICorner", {
+    Parent = Items["SubPages"].Instance,
+    CornerRadius = UDimNew(0, 7)
+})
+
+-- Mantém o CanvasSize sincronizado com a largura real dos botões
+Items["SubPages"].Instance:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+    Items["SubPagesScroll"].Instance.CanvasSize = UDim2New(0, Items["SubPages"].Instance.AbsoluteSize.X, 0, 0)
+end)         
+
+                
                 Page.Items = Items
             end
 
@@ -2513,6 +2533,8 @@ local NewColumn = Instances:Create("ScrollingFrame", {
     AutomaticCanvasSize = Enum.AutomaticSize.Y,
     CanvasSize = UDim2New(0, 0, 0, 0),
     ScrollBarImageTransparency = 0.5,
+    ClipsDescendants = true,           -- ⬅️ LINHA NOVA 1: Corta o que passar da borda
+    ScrollingDirection = Enum.ScrollingDirection.Y  -- ⬅️ LINHA NOVA 2: Força rolagem pra baixo
 })
         
         Instances:Create("UIPadding", {
