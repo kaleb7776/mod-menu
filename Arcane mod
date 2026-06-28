@@ -68,7 +68,7 @@ local Library do
         Directory = "esdeeeeee",
         Configs = "esdeeeeee/Configs",
         Assets = "esdeeeeee/Assets",
-        Fonts = "esdeeeeee/Fonts",   -- <-- ADICIONE ESTA LINHA
+        Fonts = "esdeeeeee/Fonts"   -- <-- ADICIONE ESTA LINHA
     },
         -- Ignore below
         Pages = { },
