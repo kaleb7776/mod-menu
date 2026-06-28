@@ -64,12 +64,12 @@ local Library do
 
         FadeSpeed = 0.2,
 
-        Folders = {
-            Directory = "esdeeeeee",
-            Configs = "esdeeeeee/Configs",
-            Assets = "esdeeeeee/Assets",
-        },
-
+    Folders = {
+        Directory = "esdeeeeee",
+        Configs = "esdeeeeee/Configs",
+        Assets = "esdeeeeee/Assets",
+        Fonts = "esdeeeeee/Fonts",   -- <-- ADICIONE ESTA LINHA
+    },
         -- Ignore below
         Pages = { },
         Sections = { },
@@ -184,6 +184,7 @@ local Library do
     Library.Pages.__index = Library.Pages
 
     Library.Theme = TableClone(Themes["Preset"])
+Library.Images = {}   
 
     -- Folders
     for Index, Value in Library.Folders do 
@@ -3973,8 +3974,12 @@ end
             end
 
             do -- Settings
-                local SettingsSection = SettingsSubPage:Section({Name = "Settings", Icon = "72732892493295", Side = 1})     
-                
+             local SettingsSection = SettingsSubPage:Section({
+    Name = "Settings", 
+    Icon = "72732892493295", 
+    Side = 1,
+    IsSettings = true   -- <-- ADICIONE ESTA LINHA
+})
                 SettingsSection:Button({
                     Name = "Unload",
                     Callback = function()
@@ -4033,4 +4038,3 @@ end
 
 getgenv().Library = Library
 return Library
-end
