@@ -1,0 +1,310 @@
+Aqui está um script LocalScript completo que carrega a Zov-UI diretamente do GitHub e demonstra todos os elementos disponíveis, com comentários explicativos em português.
+
+⚠️ Importante: Coloque este código em um LocalScript dentro de StarterPlayerScripts ou StarterGui.
+
+```lua
+--[[
+   ================================================================
+   SCRIPT EXEMPLO COMPLETO - ZOV UI (v1.2)
+   ================================================================
+   Este script demonstra TODAS as funcionalidades da biblioteca:
+   - Janela com abas
+   - Seções
+   - Labels
+   - Botões
+   - Toggles (interruptores)
+   - Sliders (controles deslizantes)
+   - Textboxes (caixas de texto)
+   - Dropdowns (menus suspensos)
+   - Keybinds (atalhos de teclado)
+   - Color Picker (seletor de cores)
+   - Notificações
+   - Sistema de Flags (variáveis globais)
+   ================================================================
+]]
+
+-- ================================================================
+-- 1. CARREGAR A BIBLIOTECA ZOV-UI
+-- ================================================================
+
+-- A biblioteca é carregada diretamente do repositório oficial no GitHub
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/egor2078f/Zov-UI/refs/heads/main/zov.lua"))()
+
+-- ================================================================
+-- 2. CRIAR A JANELA PRINCIPAL
+-- ================================================================
+
+-- Parâmetros: (Nome da Janela, Tecla para Abrir/Fechar)
+-- Tecla padrão: RightControl | Neste exemplo usamos F1
+local Window = Library:CreateWindow("Meu Hub Zov", Enum.KeyCode.F1)
+
+-- ================================================================
+-- 3. CRIAR AS ABAS
+-- ================================================================
+
+-- Cada aba recebe um nome e um ícone (opcional)
+local HomeTab = Window:AddTab("Início", "🏠")
+local CombatTab = Window:AddTab("Combate", "⚔️")
+local VisualsTab = Window:AddTab("Visuais", "🎨")
+local SettingsTab = Window:AddTab("Configurações", "⚙️")
+
+-- ================================================================
+-- 4. ABA: INÍCIO (HomeTab)
+-- ================================================================
+
+-- 4.1 Seção de Informações
+local InfoSection = HomeTab:AddSection("Informações")
+
+-- Label simples (texto informativo)
+InfoSection:AddLabel("Bem-vindo ao Meu Hub Zov!")
+InfoSection:AddLabel("Versão 1.2 - Desenvolvido com Zov-UI")
+
+-- 4.2 Seção de Ações Rápidas
+local QuickSection = HomeTab:AddSection("Ações Rápidas")
+
+-- Botão que dispara uma notificação
+QuickSection:AddButton("Dizer Olá", function()
+    Library:Notify("Olá!", "Você clicou no botão!", 3, "Info")
+end)
+
+-- Botão de sucesso
+QuickSection:AddButton("Operação Concluída", function()
+    Library:Notify("Sucesso!", "A operação foi realizada com sucesso.", 3, "Success")
+end)
+
+-- Botão de aviso
+QuickSection:AddButton("Atenção", function()
+    Library:Notify("Cuidado!", "Isso é um aviso importante.", 3, "Warning")
+end)
+
+-- Botão de erro
+QuickSection:AddButton("Erro", function()
+    Library:Notify("Erro!", "Algo deu errado.", 3, "Error")
+end)
+
+-- 4.3 Seção de Flags (Variáveis Globais)
+local FlagSection = HomeTab:AddSection("Flags (Variáveis Globais)")
+
+FlagSection:AddLabel("As flags ficam armazenadas em Library.Flags")
+FlagSection:AddLabel("Você pode acessá-las de qualquer lugar do script.")
+
+-- Botão para exibir todas as flags
+FlagSection:AddButton("Exibir Todas as Flags", function()
+    local msg = ""
+    for chave, valor in pairs(Library.Flags) do
+        msg = msg .. chave .. " = " .. tostring(valor) .. "\n"
+    end
+    if msg == "" then
+        msg = "Nenhuma flag definida ainda."
+    end
+    Library:Notify("Flags Atuais", msg, 5, "Info")
+end)
+
+-- ================================================================
+-- 5. ABA: COMBATE (CombatTab)
+-- ================================================================
+
+-- 5.1 Seção: Aimbot
+local AimbotSection = CombatTab:AddSection("Aimbot")
+
+-- Toggle (interruptor) com flag "AimbotEnabled"
+local aimbotToggle = AimbotSection:AddToggle("Ativar Aimbot", false, "AimbotEnabled", function(estado)
+    print("[Aimbot] Estado:", estado)
+    Library:Notify("Aimbot", estado and "Ativado ✓" or "Desativado ✗", 2, estado and "Success" or "Error")
+end)
+
+-- Slider (controle deslizante) com flag "AimbotSensitivity"
+local sensSlider = AimbotSection:AddSlider("Sensibilidade", 1, 10, 5, "AimbotSensitivity", function(valor)
+    print("[Aimbot] Sensibilidade:", valor)
+end)
+
+-- Dropdown (menu suspenso) com flag "AimbotTarget"
+local targetDropdown = AimbotSection:AddDropdown(
+    "Alvo Prioritário",           -- Título
+    {"Cabeça", "Tronco", "Pernas"}, -- Opções
+    "Cabeça",                     -- Valor padrão
+    "AimbotTarget",               -- Flag
+    function(opcao)
+        print("[Aimbot] Alvo alterado para:", opcao)
+    end
+)
+
+-- Keybind (atalho de teclado) com flag "AimbotKeybind"
+local aimbotKey = AimbotSection:AddKeybind("Atalho Aimbot", Enum.KeyCode.X, "AimbotKeybind", function()
+    -- Inverte o estado atual do toggle
+    local novoEstado = not Library.Flags.AimbotEnabled
+    aimbotToggle:Set(novoEstado) -- Atualiza visualmente o toggle
+    -- O callback do toggle será chamado automaticamente
+end)
+
+-- 5.2 Seção: Triggerbot
+local TriggerSection = CombatTab:AddSection("Triggerbot")
+
+local triggerToggle = TriggerSection:AddToggle("Ativar Triggerbot", false, "TriggerEnabled", function(estado)
+    print("[Triggerbot] Estado:", estado)
+end)
+
+local triggerDelay = TriggerSection:AddSlider("Delay (ms)", 0, 500, 100, "TriggerDelay", function(valor)
+    print("[Triggerbot] Delay:", valor)
+end)
+
+-- Textbox (caixa de texto) com flag "TriggerTeam"
+local triggerTeam = TriggerSection:AddTextbox("Time alvo (ex: Enemy)", "TriggerTeam", function(texto)
+    print("[Triggerbot] Time alvo:", texto)
+end)
+
+-- ================================================================
+-- 6. ABA: VISUAIS (VisualsTab)
+-- ================================================================
+
+-- 6.1 Seção: Cores
+local ColorSection = VisualsTab:AddSection("Personalização de Cores")
+
+-- Color Picker (seletor de cores) com flag "ESPColor"
+local espColor = ColorSection:AddColorPicker("Cor do ESP", Color3.fromRGB(255, 100, 100), "ESPColor", function(cor)
+    print("[Visual] Cor ESP alterada para:", cor)
+end)
+
+local boxColor = ColorSection:AddColorPicker("Cor da Box", Color3.fromRGB(100, 200, 255), "BoxColor", function(cor)
+    print("[Visual] Cor Box alterada para:", cor)
+end)
+
+-- 6.2 Seção: Opções Visuais
+local ToggleSection = VisualsTab:AddSection("Opções Visuais")
+
+local espToggle = ToggleSection:AddToggle("ESP Ativo", true, "ESPVisible", function(estado)
+    print("[Visual] ESP visível:", estado)
+end)
+
+local nameToggle = ToggleSection:AddToggle("Mostrar Nomes", true, "ShowNames", function(estado)
+    print("[Visual] Mostrar nomes:", estado)
+end)
+
+local healthToggle = ToggleSection:AddToggle("Mostrar Vida", true, "ShowHealth", function(estado)
+    print("[Visual] Mostrar vida:", estado)
+end)
+
+local opacitySlider = ToggleSection:AddSlider("Opacidade", 0, 100, 80, "ESPOpacity", function(valor)
+    print("[Visual] Opacidade ESP:", valor)
+end)
+
+-- ================================================================
+-- 7. ABA: CONFIGURAÇÕES (SettingsTab)
+-- ================================================================
+
+-- 7.1 Seção: Interface
+local UISection = SettingsTab:AddSection("Interface")
+
+UISection:AddButton("Resetar Posição da Janela", function()
+    -- Notifica o usuário (a UI já tem um botão nativo para isso)
+    Library:Notify("Posição", "Janela resetada para o centro!", 2, "Success")
+end)
+
+UISection:AddButton("Destruir Interface", function()
+    Library:Notify("UI", "Destruindo a interface em 2 segundos...", 2, "Warning")
+    task.wait(2)
+    -- A própria Zov-UI tem um botão "Destroy UI" nativo na aba Settings
+    -- Mas aqui está um exemplo de como fazer manualmente:
+    local gui = game.CoreGui:FindFirstChild("RavionUI")
+    if gui then gui:Destroy() end
+    Library:Notify("UI", "Interface destruída!", 2, "Error")
+end)
+
+-- 7.2 Seção: Informações do Usuário
+local UserSection = SettingsTab:AddSection("Usuário")
+
+local jogador = game.Players.LocalPlayer
+UserSection:AddLabel("Nome: " .. jogador.Name)
+UserSection:AddLabel("ID: " .. jogador.UserId)
+UserSection:AddLabel("Time: " .. (jogador.Team and jogador.Team.Name or "Sem time"))
+
+-- 7.3 Seção: Atalhos Globais
+local KeybindSection = SettingsTab:AddSection("Atalhos Globais")
+
+-- Keybind para alternar a UI (já existe nativamente, mas podemos criar um personalizado)
+local mainKey = KeybindSection:AddKeybind("Alternar UI (personalizado)", Enum.KeyCode.F2, "UIKeybind", function()
+    -- A Zov-UI já gerencia o toggle com a tecla definida em CreateWindow
+    -- Aqui só adicionamos um efeito extra
+    Library:Notify("Atalho", "Tecla F2 pressionada!", 2, "Info")
+end)
+
+-- ================================================================
+-- 8. ACESSANDO AS FLAGS EM QUALQUER LUGAR DO SCRIPT
+-- ================================================================
+
+-- Exemplo: acessar as flags após 3 segundos
+task.delay(3, function()
+    print("=== FLAGS ATUAIS ===")
+    print("AimbotEnabled:", Library.Flags.AimbotEnabled)
+    print("AimbotSensitivity:", Library.Flags.AimbotSensitivity)
+    print("AimbotTarget:", Library.Flags.AimbotTarget)
+    print("ESPColor:", Library.Flags.ESPColor)
+    print("====================")
+end)
+
+-- ================================================================
+-- 9. NOTIFICAÇÃO DE BOAS-VINDAS
+-- ================================================================
+
+-- Exibe uma notificação ao iniciar o script
+Library:Notify("Bem-vindo!", "Meu Hub Zov foi carregado com sucesso!", 4, "Success")
+
+-- ================================================================
+-- 10. EVENTOS PERSONALIZADOS (OPCIONAL)
+-- ================================================================
+
+-- Exemplo: escutar teclas globais para ações personalizadas
+local UserInputService = game:GetService("UserInputService")
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    -- gameProcessed indica se o jogo já processou a tecla (ex: chat aberto)
+    if gameProcessed then return end
+
+    -- Tecla personalizada: Shift Direito
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        Library:Notify("Atalho Personalizado", "Shift direito pressionado!", 2, "Warning")
+    end
+
+    -- Tecla personalizada: G
+    if input.KeyCode == Enum.KeyCode.G then
+        Library:Notify("Atalho", "Tecla G pressionada!", 2, "Info")
+    end
+end)
+
+-- ================================================================
+-- 11. FINALIZAÇÃO
+-- ================================================================
+
+print("[Zov-UI] Script exemplo carregado com sucesso!")
+print("[Zov-UI] Pressione F1 para abrir/fechar a interface.")
+```
+
+---
+
+📖 Resumo dos Elementos Utilizados
+
+Elemento Método Descrição
+Janela Library:CreateWindow(nome, tecla) Cria a interface principal
+Aba Window:AddTab(nome, ícone) Adiciona uma nova aba
+Seção Tab:AddSection(nome) Agrupa elementos dentro de uma aba
+Label Section:AddLabel(texto) Exibe texto informativo
+Botão Section:AddButton(texto, callback) Botão que executa uma função
+Toggle Section:AddToggle(texto, padrão, flag, callback) Interruptor liga/desliga
+Slider Section:AddSlider(texto, min, max, padrão, flag, callback) Controle deslizante de valor
+Textbox Section:AddTextbox(placeholder, flag, callback) Campo de entrada de texto
+Dropdown Section:AddDropdown(texto, opções, padrão, flag, callback) Menu suspenso de seleção
+Keybind Section:AddKeybind(texto, tecla, flag, callback) Atalho de teclado
+Color Picker Section:AddColorPicker(texto, cor, flag, callback) Seletor de cores
+Notificação Library:Notify(título, texto, duração, tipo) Exibe notificação na tela
+Flags Library.Flags[nome] Armazena valores de forma global
+
+---
+
+🎮 Teclas Padrão
+
+Tecla Função
+F1 Abrir/Fechar a interface (definida em CreateWindow)
+X Ativar/Desativar Aimbot (definida no Keybind)
+F2 Atalho personalizado para alternar UI
+RightShift Atalho personalizado (exemplo)
+G Atalho personalizado (exemplo)
