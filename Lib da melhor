@@ -347,8 +347,7 @@ function Library:CreateWindow(hubName, toggleKey)
         
         MakeDraggable(TopBar, Main)
         
-        -- logo
--- LOGO - MÉTODO DO LOADER V2.1 (COM game:HttpGet)
+-- LOGO - COM NOTIFICAÇÕES (baseado no loader V2.1)
 local Logo = Create("Frame", {
     Name = "Logo",
     Size = UDim2.new(0, 28, 0, 28),
@@ -361,11 +360,13 @@ local Logo = Create("Frame", {
 if Logo then
     AddCorner(Logo, 6)
 
-    local imagePath = "classic_hub_logo.png"  -- mesmo nome do loader
+    local imagePath = "classic_hub_logo.png"
     local imageUrl = "https://i.postimg.cc/WbFVrmNQ/logo1-removebg-preview-(1).png"
+    local imagemCarregada = false
 
-    -- Fallback (letra inicial) com fonte segura
+    -- Fallback (letra)
     local function UseFallback()
+        if imagemCarregada then return end
         Logo.BackgroundTransparency = 0
         Create("TextLabel", {
             Size = UDim2.new(1, 0, 1, 0),
@@ -373,35 +374,21 @@ if Logo then
             Text = string.sub(hubName, 1, 1):upper(),
             TextColor3 = Color3.new(1, 1, 1),
             TextSize = 14,
-            Font = Enum.Font.SourceSansBold,  -- Fonte compatível
+            Font = Enum.Font.SourceSansBold,
             Parent = Logo
         })
+        Library:Notify("Logo", "Imagem não encontrada. Usando letra.", 3, "Warning")
     end
 
-    -- Baixa a imagem usando game:HttpGet (igual ao loader)
-    local function DownloadImage()
-        if isfile(imagePath) then 
-            return true 
-        end
-        local success, data = pcall(game.HttpGet, game, imageUrl)
-        if success and data and #data > 100 then
-            local writeOk = pcall(writefile, imagePath, data)
-            if writeOk then
-                return isfile(imagePath)
-            end
-        end
-        return false
-    end
-
-    -- Tenta carregar a imagem (com getcustomasset ou rbxasset://)
-    local function LoadImage()
+    -- Aplica a imagem já baixada
+    local function AplicarImagem()
+        if imagemCarregada then return true end
         if not isfile(imagePath) then
-            if not DownloadImage() then
-                return false
-            end
+            Library:Notify("Logo", "Arquivo não encontrado.", 2, "Error")
+            return false
         end
 
-        -- Se existe o arquivo, tenta getcustomasset (estilo loader)
+        -- Tenta getcustomasset (estilo loader)
         if getcustomasset then
             local assetId = getcustomasset(imagePath)
             if assetId and assetId ~= "" then
@@ -413,6 +400,8 @@ if Logo then
                     ScaleType = Enum.ScaleType.Fit,
                     Parent = Logo
                 })
+                imagemCarregada = true
+                Library:Notify("Logo", "Carregado via getcustomasset ✅", 2, "Success")
                 return true
             end
         end
@@ -426,16 +415,50 @@ if Logo then
             ScaleType = Enum.ScaleType.Fit,
             Parent = Logo
         })
+        imagemCarregada = true
+        Library:Notify("Logo", "Carregado via rbxasset://", 2, "Info")
         return true
     end
 
-    -- Executa o carregamento
-    local loaded = LoadImage()
-    if not loaded then
+    -- Baixa a imagem (se não existir) e espera
+    local function BaixarEExecutar()
+        if isfile(imagePath) then
+            AplicarImagem()
+            return
+        end
+
+        Library:Notify("Logo", "Baixando imagem...", 2, "Info")
+        local success, data = pcall(game.HttpGet, game, imageUrl)
+        if success and data and #data > 100 then
+            local writeOk = pcall(writefile, imagePath, data)
+            if writeOk then
+                Library:Notify("Logo", "Download concluído!", 2, "Success")
+                AplicarImagem()
+                return
+            else
+                Library:Notify("Logo", "Falha ao salvar arquivo.", 3, "Error")
+            end
+        else
+            Library:Notify("Logo", "Falha no download.", 3, "Error")
+        end
         UseFallback()
     end
+
+    -- Executa o download (síncrono)
+    BaixarEExecutar()
+
+    -- Segunda tentativa após 1 segundo (caso o arquivo demore a ser escrito)
+    task.delay(1.5, function()
+        if not imagemCarregada then
+            if AplicarImagem() then
+                Library:Notify("Logo", "Carregado na segunda tentativa ✅", 2, "Success")
+            else
+                UseFallback()
+            end
+        end
+    end)
 end
-        -- Title
+-- Title
         Create("TextLabel", {
             Name = "Title",
             Size = UDim2.new(0, 200, 1, 0),
