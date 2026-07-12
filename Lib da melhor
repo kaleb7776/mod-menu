@@ -284,92 +284,27 @@ function Library:CreateWindow(hubName, toggleKey)
         ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
     
-    -- Mobile Button (com logo em vez de texto)
-local MobileBtn = Create("ImageButton", {
-    Name = "MobileButton",
-    Size = UDim2.new(0, 55, 0, 55),
-    Position = UDim2.new(0, 20, 0.5, -27.5),
-    BackgroundColor3 = Theme.Section,
-    BackgroundTransparency = 0.15,
-    Image = "",  -- será atualizado
-    ImageTransparency = 0,
-    ScaleType = Enum.ScaleType.Fit,
-    Visible = false,
-    ZIndex = 100,
-    Parent = ScreenGui
-})
-
-if MobileBtn then
-    AddCorner(MobileBtn, 27.5)
-    AddStroke(MobileBtn, Theme.Accent, 2)
-    MakeDraggable(MobileBtn, MobileBtn)
-
-    -- Carrega a mesma logo para o botão mobile
-    local function LoadMobileLogo()
-        local imagePath = "classic_hub_logo.png"
-        if isfile(imagePath) then
-            if getcustomasset then
-                local assetId = getcustomasset(imagePath)
-                if assetId and assetId ~= "" then
-                    MobileBtn.Image = assetId
-                    return true
-                end
-            end
-            -- Fallback rbxasset
-            MobileBtn.Image = "rbxasset://" .. imagePath
-            return true
-        end
-        return false
+    -- Mobile Button
+    local MobileBtn = Create("TextButton", {
+        Name = "MobileButton",
+        Size = UDim2.new(0, 50, 0, 50),
+        Position = UDim2.new(0, 20, 0.5, -25),
+        BackgroundColor3 = Theme.Section,
+        Text = "≡",
+        TextColor3 = Theme.Accent,
+        TextSize = 24,
+        Font = Enum.Font.GothamBold,
+        Visible = false,
+        ZIndex = 100,
+        Parent = ScreenGui
+    })
+    
+    if MobileBtn then
+        AddCorner(MobileBtn, 25)
+        AddStroke(MobileBtn, Theme.Accent, 2)
+        MakeDraggable(MobileBtn, MobileBtn)
     end
-
-    -- Se a imagem não existir, baixa (reutiliza a mesma lógica)
-    if not LoadMobileLogo() then
-        local url = "https://i.postimg.cc/WbFVrmNQ/logo1-removebg-preview-(1).png"
-        local success, data = pcall(game.HttpGet, game, url)
-        if success and data and #data > 100 then
-            pcall(writefile, "classic_hub_logo.png", data)
-            LoadMobileLogo()
-        end
-    end
-
-    -- Se ainda não carregou, usa um texto fallback
-    if MobileBtn.Image == "" then
-        MobileBtn:Destroy()
-        -- Cria um TextButton como fallback
-        local FallbackBtn = Create("TextButton", {
-            Name = "MobileButton",
-            Size = UDim2.new(0, 50, 0, 50),
-            Position = UDim2.new(0, 20, 0.5, -25),
-            BackgroundColor3 = Theme.Section,
-            Text = "≡",
-            TextColor3 = Theme.Accent,
-            TextSize = 24,
-            Font = Enum.Font.SourceSansBold,
-            Visible = false,
-            ZIndex = 100,
-            Parent = ScreenGui
-        })
-        if FallbackBtn then
-            AddCorner(FallbackBtn, 25)
-            AddStroke(FallbackBtn, Theme.Accent, 2)
-            MakeDraggable(FallbackBtn, FallbackBtn)
-            FallbackBtn.MouseButton1Click:Connect(function()
-                Library.Open = true
-                Main.Visible = true
-                FallbackBtn.Visible = false
-            end)
-            -- Substitui a referência
-            MobileBtn = FallbackBtn
-        end
-    else
-        -- Evento de clique (abrir menu)
-        MobileBtn.MouseButton1Click:Connect(function()
-            Library.Open = true
-            Main.Visible = true
-            MobileBtn.Visible = false
-        end)
-    end
-end
+    
     -- Main Frame
     local Main = Create("Frame", {
         Name = "Main",
@@ -411,8 +346,7 @@ end
         })
         
         MakeDraggable(TopBar, Main)
-        
--- LOGO - COM NOTIFICAÇÕES (baseado no loader V2.1)
+    -- LOGO ATUALIZADO (Compatível com executores modernos)
 local Logo = Create("Frame", {
     Name = "Logo",
     Size = UDim2.new(0, 28, 0, 28),
@@ -425,13 +359,13 @@ local Logo = Create("Frame", {
 if Logo then
     AddCorner(Logo, 6)
 
-    local imagePath = "classic_hub_logo.png"
+    local imagePath = "ravion_logo.png"
     local imageUrl = "https://i.postimg.cc/WbFVrmNQ/logo1-removebg-preview-(1).png"
-    local imagemCarregada = false
 
-    -- Fallback (letra)
+    -- Identifica de forma segura a função de requisição do executor atual
+    local HttpRequest = request or http_request or (syn and syn.request)
+
     local function UseFallback()
-        if imagemCarregada then return end
         Logo.BackgroundTransparency = 0
         Create("TextLabel", {
             Size = UDim2.new(1, 0, 1, 0),
@@ -439,91 +373,56 @@ if Logo then
             Text = string.sub(hubName, 1, 1):upper(),
             TextColor3 = Color3.new(1, 1, 1),
             TextSize = 14,
-            Font = Enum.Font.SourceSansBold,
+            Font = Enum.Font.SourceSansBold, -- Gotham foi descontinuada pela Roblox
             Parent = Logo
         })
-        Library:Notify("Logo", "Imagem não encontrada. Usando letra.", 3, "Warning")
     end
 
-    -- Aplica a imagem já baixada
-    local function AplicarImagem()
-        if imagemCarregada then return true end
-        if not isfile(imagePath) then
-            Library:Notify("Logo", "Arquivo não encontrado.", 2, "Error")
-            return false
-        end
+    -- Se o arquivo não existir localmente, tenta baixar usando o executor
+    if not isfile(imagePath) and HttpRequest then
+        local downloadSuccess, response = pcall(function()
+            return HttpRequest({
+                Url = imageUrl,
+                Method = "GET"
+            })
+        end)
 
-        -- Tenta getcustomasset (estilo loader)
-        if getcustomasset then
-            local assetId = getcustomasset(imagePath)
-            if assetId and assetId ~= "" then
-                Logo.BackgroundTransparency = 1
-                Create("ImageLabel", {
-                    Size = UDim2.new(1, 0, 1, 0),
-                    BackgroundTransparency = 1,
-                    Image = assetId,
-                    ScaleType = Enum.ScaleType.Fit,
-                    Parent = Logo
-                })
-                imagemCarregada = true
-                Library:Notify("Logo", "Carregado via getcustomasset ✅", 2, "Success")
-                return true
-            end
+        if downloadSuccess and response and response.StatusCode == 200 and response.Body then
+            pcall(function()
+                writefile(imagePath, response.Body)
+            end)
         end
-
-        -- Fallback: rbxasset://
-        Logo.BackgroundTransparency = 1
-        Create("ImageLabel", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1,
-            Image = "rbxasset://" .. imagePath,
-            ScaleType = Enum.ScaleType.Fit,
-            Parent = Logo
-        })
-        imagemCarregada = true
-        Library:Notify("Logo", "Carregado via rbxasset://", 2, "Info")
-        return true
     end
 
-    -- Baixa a imagem (se não existir) e espera
-    local function BaixarEExecutar()
-        if isfile(imagePath) then
-            AplicarImagem()
-            return
-        end
-
-        Library:Notify("Logo", "Baixando imagem...", 2, "Info")
-        local success, data = pcall(game.HttpGet, game, imageUrl)
-        if success and data and #data > 100 then
-            local writeOk = pcall(writefile, imagePath, data)
-            if writeOk then
-                Library:Notify("Logo", "Download concluído!", 2, "Success")
-                AplicarImagem()
-                return
-            else
-                Library:Notify("Logo", "Falha ao salvar arquivo.", 3, "Error")
-            end
+    -- Tenta renderizar a imagem usando a API correta do seu executor (getcustomasset)
+    if isfile(imagePath) then
+        local getAsset = getcustomasset or getasset or (drawing and drawing.new and getcustomasset)
+        
+        if getAsset then
+            Logo.BackgroundTransparency = 1
+            Create("ImageLabel", {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Image = getAsset(imagePath), -- Transforma o arquivo em uma ID que o Roblox entende
+                ScaleType = Enum.ScaleType.Fit,
+                Parent = Logo
+            })
         else
-            Library:Notify("Logo", "Falha no download.", 3, "Error")
+            -- Se o seu executor não tiver getcustomasset, usa o link direto da Web
+            Logo.BackgroundTransparency = 1
+            Create("ImageLabel", {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Image = imageUrl,
+                ScaleType = Enum.ScaleType.Fit,
+                Parent = Logo
+            })
         end
+    else
         UseFallback()
     end
-
-    -- Executa o download (síncrono)
-    BaixarEExecutar()
-
-    -- Segunda tentativa após 1 segundo (caso o arquivo demore a ser escrito)
-    task.delay(1.5, function()
-        if not imagemCarregada then
-            if AplicarImagem() then
-                Library:Notify("Logo", "Carregado na segunda tentativa ✅", 2, "Success")
-            else
-                UseFallback()
-            end
-        end
-    end)
 end
--- Title
+        -- Title
         Create("TextLabel", {
             Name = "Title",
             Size = UDim2.new(0, 200, 1, 0),
@@ -536,226 +435,63 @@ end
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = TopBar
         })
-    -- =============================================================
--- BOTÕES DA TOP BAR (3 botões com confirmação)
--- =============================================================
-
--- 1. Botão Minimizar (alterna janela cheia ↔ apenas barra)
-local MinBtn = Create("TextButton", {
-    Name = "Minimize",
-    Size = UDim2.new(0, 30, 0, 30),
-    Position = UDim2.new(1, -110, 0.5, -15),
-    BackgroundColor3 = Theme.Element,
-    Text = "−",
-    TextColor3 = Theme.TextDark,
-    TextSize = 18,
-    Font = Enum.Font.SourceSansBold,
-    Parent = TopBar
-})
-if MinBtn then
-    AddCorner(MinBtn, 6)
-    AddStroke(MinBtn, Theme.Border, 0.5)
-
-    MinBtn.MouseEnter:Connect(function()
-        Tween(MinBtn, 0.15, {BackgroundColor3 = Theme.ElementHover})
-    end)
-    MinBtn.MouseLeave:Connect(function()
-        Tween(MinBtn, 0.15, {BackgroundColor3 = Theme.Element})
-    end)
-
-    MinBtn.MouseButton1Click:Connect(function()
-        local isMinimized = Main.Size.Y.Offset <= 50
-        local targetSize = isMinimized and UDim2.new(0, 600, 0, 400) or UDim2.new(0, 600, 0, 40)
-        local icon = isMinimized and "−" or "+"
-        Tween(Main, 0.25, {Size = targetSize})
-        MinBtn.Text = icon
-
-        -- Esconde/mostra sidebar e conteúdo
-        local frames = {Sidebar, ContentArea}
-        for _, f in ipairs(frames) do
-            if f then
-                f.Visible = isMinimized
-                Tween(f, 0.2, {BackgroundTransparency = isMinimized and 0 or 1})
-            end
-        end
-    end)
-end
-
--- 2. Botão Toggle (Amarelo) - Abre/fecha o menu (sincronizado com keybind)
-local ToggleBtn = Create("TextButton", {
-    Name = "Toggle",
-    Size = UDim2.new(0, 30, 0, 30),
-    Position = UDim2.new(1, -75, 0.5, -15),
-    BackgroundColor3 = Theme.Warning,
-    Text = "⬜",
-    TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 16,
-    Font = Enum.Font.SourceSansBold,
-    Parent = TopBar
-})
-if ToggleBtn then
-    AddCorner(ToggleBtn, 6)
-    AddStroke(ToggleBtn, Theme.Warning, 0.5)
-
-    ToggleBtn.MouseEnter:Connect(function()
-        Tween(ToggleBtn, 0.15, {BackgroundColor3 = Theme.Warning:Lerp(Color3.new(0,0,0), 0.2)})
-    end)
-    ToggleBtn.MouseLeave:Connect(function()
-        Tween(ToggleBtn, 0.15, {BackgroundColor3 = Theme.Warning})
-    end)
-
-    local function UpdateToggleIcon()
-        local visible = Main.Visible and Main.Size.Y.Offset > 50
-        ToggleBtn.Text = visible and "⬜" or "⬛"
-        ToggleBtn.BackgroundColor3 = visible and Theme.Warning or Theme.Element
-    end
-
-    ToggleBtn.MouseButton1Click:Connect(function()
-        Library.Open = not Library.Open
-        Main.Visible = Library.Open
-        if Main.Size.Y.Offset > 50 then
-            Sidebar.Visible = Library.Open
-            ContentArea.Visible = Library.Open
-        end
-        if IsMobile and MobileBtn then
-            MobileBtn.Visible = not Library.Open
-        end
-        UpdateToggleIcon()
-    end)
-
-    UpdateToggleIcon()
-end
-
--- 3. Botão Fechar (Vermelho) - com confirmação e destruição permanente
-local CloseBtn = Create("TextButton", {
-    Name = "Close",
-    Size = UDim2.new(0, 30, 0, 30),
-    Position = UDim2.new(1, -38, 0.5, -15),
-    BackgroundColor3 = Theme.Error,
-    Text = "✕",
-    TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 18,
-    Font = Enum.Font.SourceSansBold,
-    Parent = TopBar
-})
-if CloseBtn then
-    AddCorner(CloseBtn, 6)
-    AddStroke(CloseBtn, Theme.Error, 0.5)
-
-    CloseBtn.MouseEnter:Connect(function()
-        Tween(CloseBtn, 0.15, {BackgroundColor3 = Theme.Error:Lerp(Color3.new(0,0,0), 0.2)})
-    end)
-    CloseBtn.MouseLeave:Connect(function()
-        Tween(CloseBtn, 0.15, {BackgroundColor3 = Theme.Error})
-    end)
-
-    -- Sistema de confirmação
-    local function ShowConfirmDialog()
-        -- Cria um overlay escuro
-        local overlay = Create("Frame", {
-            Name = "ConfirmOverlay",
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundColor3 = Color3.new(0, 0, 0),
-            BackgroundTransparency = 0.6,
-            ZIndex = 999,
-            Parent = ScreenGui
-        })
-        AddCorner(overlay, 0)
-
-        -- Caixa de diálogo
-        local dialog = Create("Frame", {
-            Name = "Dialog",
-            Size = UDim2.new(0, 280, 0, 120),
-            Position = UDim2.new(0.5, -140, 0.5, -60),
-            BackgroundColor3 = Theme.Background,
-            BorderSizePixel = 0,
-            ZIndex = 1000,
-            Parent = overlay
-        })
-        AddCorner(dialog, 12)
-        AddStroke(dialog, Theme.Border)
-
-        -- Texto
-        Create("TextLabel", {
-            Name = "Message",
-            Size = UDim2.new(1, -30, 0, 40),
-            Position = UDim2.new(0, 15, 0, 15),
-            BackgroundTransparency = 1,
-            Text = "Tem certeza que quer fechar o menu?",
-            TextColor3 = Theme.Text,
-            TextSize = 14,
-            Font = Enum.Font.SourceSansBold,
-            TextWrapped = true,
-            TextXAlignment = Enum.TextXAlignment.Center,
-            Parent = dialog
-        })
-
-        -- Container dos botões
-        local btnContainer = Create("Frame", {
-            Name = "Buttons",
-            Size = UDim2.new(1, -30, 0, 36),
-            Position = UDim2.new(0, 15, 1, -50),
-            BackgroundTransparency = 1,
-            Parent = dialog
-        })
-
-        -- Botão "Sim" (destruir)
-        local yesBtn = Create("TextButton", {
-            Name = "Yes",
-            Size = UDim2.new(0.45, 0, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0),
+        
+        -- Close Button
+        local CloseBtn = Create("TextButton", {
+            Name = "Close",
+            Size = UDim2.new(0, 30, 0, 30),
+            Position = UDim2.new(1, -38, 0.5, -15),
             BackgroundColor3 = Theme.Error,
-            Text = "Sim, fechar",
+            Text = "×",
             TextColor3 = Color3.new(1, 1, 1),
-            TextSize = 13,
-            Font = Enum.Font.SourceSansBold,
-            ZIndex = 1001,
-            Parent = btnContainer
+            TextSize = 18,
+            Font = Enum.Font.GothamBold,
+            Parent = TopBar
         })
-        AddCorner(yesBtn, 6)
-
-        -- Botão "Não" (cancelar)
-        local noBtn = Create("TextButton", {
-            Name = "No",
-            Size = UDim2.new(0.45, 0, 1, 0),
-            Position = UDim2.new(0.55, 0, 0, 0),
+        
+        if CloseBtn then
+            AddCorner(CloseBtn, 6)
+        end
+        
+        -- Minimize Button
+        local MinBtn = Create("TextButton", {
+            Name = "Minimize",
+            Size = UDim2.new(0, 30, 0, 30),
+            Position = UDim2.new(1, -75, 0.5, -15),
             BackgroundColor3 = Theme.Element,
-            Text = "Cancelar",
-            TextColor3 = Theme.Text,
-            TextSize = 13,
-            Font = Enum.Font.SourceSansBold,
-            ZIndex = 1001,
-            Parent = btnContainer
+            Text = "−",
+            TextColor3 = Theme.TextDark,
+            TextSize = 18,
+            Font = Enum.Font.GothamBold,
+            Parent = TopBar
         })
-        AddCorner(noBtn, 6)
-
-        -- Eventos
-        yesBtn.MouseButton1Click:Connect(function()
-            overlay:Destroy()
-            Tween(Main, 0.2, {BackgroundTransparency = 1})
-            Tween(TopBar, 0.2, {BackgroundTransparency = 1})
-            task.wait(0.25)
-            if ScreenGui then ScreenGui:Destroy() end
-            if NotifGui then NotifGui:Destroy() end
-        end)
-
-        noBtn.MouseButton1Click:Connect(function()
-            overlay:Destroy()
-        end)
-
-        overlay.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                local obj = input.Target
-                if obj and not obj:IsDescendantOf(dialog) and obj:IsDescendantOf(overlay) then
-                    overlay:Destroy()
+        
+        if MinBtn then
+            AddCorner(MinBtn, 6)
+        end
+        
+        -- Button Events
+        if CloseBtn then
+            CloseBtn.MouseButton1Click:Connect(function()
+                Library.Open = false
+                Main.Visible = false
+                if IsMobile and MobileBtn then
+                    MobileBtn.Visible = true
                 end
-            end
-        end)
-    end
-
-    CloseBtn.MouseButton1Click:Connect(ShowConfirmDialog)
-end
-
+            end)
+        end
+        
+        if MinBtn then
+            MinBtn.MouseButton1Click:Connect(function()
+                if Main.Size.Y.Offset > 50 then
+                    Tween(Main, 0.2, {Size = UDim2.new(0, 600, 0, 40)})
+                    MinBtn.Text = "+"
+                else
+                    Tween(Main, 0.2, {Size = UDim2.new(0, 600, 0, 400)})
+                    MinBtn.Text = "−"
+                end
+            end)
+        end
     end
     
     -- Sidebar
