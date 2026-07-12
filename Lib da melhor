@@ -1,4 +1,4 @@
-.local Players = game:GetService("Players")
+local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -32,29 +32,6 @@ local Library = {
     Open = true,
     Keybind = Enum.KeyCode.RightControl
 }
-
-local HttpService = game:GetService("HttpService")
-
-local CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$"
-
-local function RandomString(length)
-    local t = table.create(length)
-    for i = 1, length do
-        local n = math.random(#CHARS)
-        t[i] = CHARS:sub(n, n)
-    end
-    return table.concat(t)
-end
-
-local function RandomName()
-    -- Gera 3 GUIDs sem hífen + uma string aleatória longa
-    return table.concat({
-        HttpService:GenerateGUID(false):gsub("-", ""),
-        HttpService:GenerateGUID(false):gsub("-", ""),
-        HttpService:GenerateGUID(false):gsub("-", ""),
-        RandomString(math.random(128, 256)),
-    }, "")
-end
 
 local function Create(class, props)
     local success, inst = pcall(function()
@@ -155,7 +132,7 @@ local NotifHolder = nil
 
 local function SetupNotifications()
     NotifGui = Create("ScreenGui", {
-        Name = RandomName(),
+        Name = "RavionNotifications",
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         ResetOnSpawn = false
     })
