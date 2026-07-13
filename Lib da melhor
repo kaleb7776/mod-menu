@@ -284,27 +284,31 @@ function Library:CreateWindow(hubName, toggleKey)
         ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
     
-    -- Mobile Button
-    local MobileBtn = Create("TextButton", {
-        Name = "MobileButton",
-        Size = UDim2.new(0, 50, 0, 50),
-        Position = UDim2.new(0, 20, 0.5, -25),
-        BackgroundColor3 = Theme.Section,
-        Text = "≡",
-        TextColor3 = Theme.Accent,
-        TextSize = 24,
-        Font = Enum.Font.GothamBold,
-        Visible = false,
-        ZIndex = 100,
-        Parent = ScreenGui
-    })
+local MobileBtn = Create("TextButton", {
+    Name = "MobileButton",
+    Size = UDim2.new(0, 50, 0, 50),
+    Position = UDim2.new(0, 20, 0.5, -25),
+    BackgroundColor3 = Theme.Section,
+    Text = "",
+    AutoButtonColor = false,
+    Visible = false,
+    ZIndex = 100,
+    Parent = ScreenGui
+})
+if MobileBtn then
+    AddCorner(MobileBtn, 25)
+    AddStroke(MobileBtn, Theme.Accent, 2)
+    MakeDraggable(MobileBtn, MobileBtn)
     
-    if MobileBtn then
-        AddCorner(MobileBtn, 25)
-        AddStroke(MobileBtn, Theme.Accent, 2)
-        MakeDraggable(MobileBtn, MobileBtn)
-    end
-    
+    local img = Instance.new("ImageLabel")
+    img.Size = UDim2.new(1, -8, 1, -8)
+    img.Position = UDim2.new(0, 4, 0, 4)
+    img.BackgroundTransparency = 1
+    img.Image = "https://i.postimg.cc/WbFVrmNQ/logo1-removebg-preview-(1).png"
+    img.ScaleType = Enum.ScaleType.Fit
+    img.Parent = MobileBtn
+end
+
     -- Main Frame
     local Main = Create("Frame", {
         Name = "Main",
