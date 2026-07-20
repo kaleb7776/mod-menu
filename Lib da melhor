@@ -8,21 +8,21 @@ local LocalPlayer = Players.LocalPlayer
 local IsMobile = UserInputService.TouchEnabled
 
 local Theme = {
-    Background = Color3.fromRGB(15, 15, 18),
-    TopBar = Color3.fromRGB(20, 20, 25),
-    Sidebar = Color3.fromRGB(18, 18, 22),
-    Section = Color3.fromRGB(22, 22, 28),
-    Element = Color3.fromRGB(28, 28, 35),
-    ElementHover = Color3.fromRGB(35, 35, 45),
-    Text = Color3.fromRGB(255, 255, 255),
-    TextDark = Color3.fromRGB(150, 150, 160),
-    Accent = Color3.fromRGB(90, 120, 255),
-    AccentHover = Color3.fromRGB(110, 140, 255),
-    Border = Color3.fromRGB(40, 40, 50),
-    Toggle = Color3.fromRGB(45, 45, 55),
-    ToggleOn = Color3.fromRGB(90, 120, 255),
-    SliderBg = Color3.fromRGB(35, 35, 45),
-    Success = Color3.fromRGB(80, 200, 120),
+    Background = Color3.fromRGB(10, 10, 10),   -- quase preto
+    TopBar = Color3.fromRGB(20, 20, 20),
+    Sidebar = Color3.fromRGB(15, 15, 15),
+    Section = Color3.fromRGB(25, 25, 25),
+    Element = Color3.fromRGB(35, 35, 35),
+    ElementHover = Color3.fromRGB(50, 50, 50),
+    Text = Color3.fromRGB(255, 255, 255),      -- branco
+    TextDark = Color3.fromRGB(170, 170, 170),  -- cinza claro
+    Accent = Color3.fromRGB(200, 200, 200),    -- cinza médio (destaque)
+    AccentHover = Color3.fromRGB(220, 220, 220),
+    Border = Color3.fromRGB(40, 40, 40),
+    Toggle = Color3.fromRGB(45, 45, 45),
+    ToggleOn = Color3.fromRGB(200, 200, 200),  -- mesmo cinza do accent
+    SliderBg = Color3.fromRGB(35, 35, 35),
+    Success = Color3.fromRGB(80, 200, 120),    -- mantido
     Warning = Color3.fromRGB(255, 180, 50),
     Error = Color3.fromRGB(255, 80, 80)
 }
@@ -326,7 +326,7 @@ end
     
     AddCorner(Main, 10)
     AddStroke(Main, Theme.Border)
-    
+    local FooterHeight = 45   -- altura do roda
     -- TopBar
     local TopBar = Create("Frame", {
         Name = "TopBar",
@@ -484,7 +484,7 @@ end
                 end
             end)
         end
-        
+  
         if MinBtn then
             MinBtn.MouseButton1Click:Connect(function()
                 if Main.Size.Y.Offset > 50 then
@@ -500,9 +500,9 @@ end
     
     -- Sidebar
     local Sidebar = Create("Frame", {
-        Name = "Sidebar",
-        Size = UDim2.new(0, 140, 1, -50),
-        Position = UDim2.new(0, 5, 0, 45),
+    Name = "Sidebar",
+    Size = UDim2.new(0, 140, 1, -(50 + FooterHeight)),  -- antes era 1, -50
+    Position = UDim2.new(0, 5, 0, 45),
         BackgroundColor3 = Theme.Sidebar,
         BorderSizePixel = 0,
         Parent = Main
@@ -543,14 +543,207 @@ end
     
     -- Content Area
     local ContentArea = Create("Frame", {
-        Name = "ContentArea",
-        Size = UDim2.new(1, -155, 1, -50),
-        Position = UDim2.new(0, 150, 0, 45),
-        BackgroundTransparency = 1,
+    Name = "ContentArea",
+    Size = UDim2.new(1, -155, 1, -(50 + FooterHeight)), -- antes era 1, -50
+    Position = UDim2.new(0, 150, 0, 45),
+     BackgroundTransparency = 1,
         ClipsDescendants = true,
         Parent = Main
     })
-    
+   
+-- ===== RODAPÉ TURBINADO COM INFORMAÇÕES =====
+local Footer = Create("Frame", {
+    Name = "Footer",
+    Size = UDim2.new(1, 0, 0, FooterHeight),
+    Position = UDim2.new(0, 0, 1, -FooterHeight),
+    BackgroundColor3 = Theme.TopBar,
+    BorderSizePixel = 0,
+    Parent = Main
+})
+if Footer then
+    AddCorner(Footer, 10)
+    AddStroke(Footer, Theme.Border) -- borda para destacar
+
+    -- Fix top corners
+    local FixTop = Create("Frame", {
+        Size = UDim2.new(1, 0, 0, 10),
+        Position = UDim2.new(0, 0, 0, -10),
+        BackgroundColor3 = Theme.TopBar,
+        BorderSizePixel = 0,
+        Parent = Footer
+    })
+
+    -- ===== AVATAR (redondo) =====
+    local Avatar = Create("ImageLabel", {
+        Size = UDim2.new(0, 32, 0, 32),
+        Position = UDim2.new(0, 8, 0.5, -16),
+        BackgroundColor3 = Theme.Element,
+        BorderSizePixel = 0,
+        Parent = Footer
+    })
+    if Avatar then
+        -- Redondo perfeito
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = Avatar
+        AddStroke(Avatar, Theme.Border)
+        local userId = LocalPlayer.UserId
+        Avatar.Image = string.format(
+            "https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=48&height=48&format=png",
+            userId
+        )
+    end
+
+    -- ===== COLUNA 1: Nome do Jogador + Nível (se existir) =====
+    local NameLabel = Create("TextLabel", {
+        Size = UDim2.new(0, 140, 0, 16),
+        Position = UDim2.new(0, 48, 0, 2),
+        BackgroundTransparency = 1,
+        Text = LocalPlayer.Name,
+        TextColor3 = Theme.Text,
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Footer
+    })
+
+    -- Nível (se existir)
+    local LevelLabel = Create("TextLabel", {
+        Size = UDim2.new(0, 100, 0, 14),
+        Position = UDim2.new(0, 48, 0, 20),
+        BackgroundTransparency = 1,
+        Text = "",
+        TextColor3 = Theme.TextDark,
+        TextSize = 10,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Footer
+    })
+    -- Tenta pegar o nível do jogador
+    task.spawn(function()
+        local stats = LocalPlayer:FindFirstChild("leaderstats")
+        if stats then
+            local level = stats:FindFirstChild("Level") or stats:FindFirstChild("Nivel")
+            if level then
+                LevelLabel.Text = "Nível: " .. tostring(level.Value)
+            end
+        end
+    end)
+
+    -- ===== COLUNA 2: Jogo (nome REAL) =====
+    local GameLabel = Create("TextLabel", {
+        Size = UDim2.new(0, 200, 0, 16),
+        Position = UDim2.new(0, 200, 0, 2),
+        BackgroundTransparency = 1,
+        Text = "Carregando jogo...",
+        TextColor3 = Theme.Text,
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Footer
+    })
+
+    -- ID do jogo (menor)
+    local PlaceIdLabel = Create("TextLabel", {
+        Size = UDim2.new(0, 120, 0, 14),
+        Position = UDim2.new(0, 200, 0, 20),
+        BackgroundTransparency = 1,
+        Text = "ID: " .. game.PlaceId,
+        TextColor3 = Theme.TextDark,
+        TextSize = 10,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Footer
+    })
+
+    -- Busca o nome REAL do jogo
+    task.spawn(function()
+        local MarketplaceService = game:GetService("MarketplaceService")
+        local success, info = pcall(function()
+            return MarketplaceService:GetProductInfo(game.PlaceId)
+        end)
+        if success and info then
+            GameLabel.Text = info.Name or "Jogo Desconhecido"
+        else
+            GameLabel.Text = game.Name or "Jogo Desconhecido"
+        end
+    end)
+
+    -- ===== COLUNA 3: Executor + FPS + Ping =====
+    -- Nome do Executor
+    local ExecutorLabel = Create("TextLabel", {
+        Size = UDim2.new(0, 120, 0, 16),
+        Position = UDim2.new(0, 420, 0, 2),
+        BackgroundTransparency = 1,
+        Text = "Executor: Desconhecido",
+        TextColor3 = Theme.Text,
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Footer
+    })
+
+    -- FPS e Ping
+    local StatsLabel = Create("TextLabel", {
+        Size = UDim2.new(0, 160, 0, 14),
+        Position = UDim2.new(0, 420, 0, 20),
+        BackgroundTransparency = 1,
+        Text = "FPS: -- | Ping: --ms",
+        TextColor3 = Theme.TextDark,
+        TextSize = 10,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Footer
+    })
+
+    -- Detecta executor
+    task.spawn(function()
+        local exec = "Desconhecido"
+        if syn then exec = "Synapse X"
+        elseif krnl then exec = "Krnl"
+        elseif script and script.ExecutionEnvironment then
+            local ok, env = pcall(script.ExecutionEnvironment)
+            if ok then exec = env end
+        end
+        if getexecutorname then
+            local ok, name = pcall(getexecutorname)
+            if ok then exec = name end
+        end
+        ExecutorLabel.Text = "Executor: " .. exec
+    end)
+
+    -- Loop de FPS e Ping
+    task.spawn(function()
+        local lastUpdate = 0
+        local fps = 0
+        local ping = 0
+        local frameCount = 0
+        local timeAccum = 0
+
+        RunService.RenderStepped:Connect(function(delta)
+            frameCount = frameCount + 1
+            timeAccum = timeAccum + delta
+
+            if timeAccum >= 0.5 then
+                fps = math.floor(frameCount / timeAccum)
+                frameCount = 0
+                timeAccum = 0
+            end
+
+            -- Ping via StatsService
+            local stats = game:GetService("Stats"):FindFirstChild("Network")
+            if stats then
+                local pingData = stats:FindFirstChild("Ping")
+                if pingData then
+                    ping = math.floor(pingData.Value * 1000)
+                end
+            end
+
+            StatsLabel.Text = string.format("FPS: %d | Ping: %dms", fps, ping)
+        end)
+    end)
+end
+
     -- Mobile Toggle
     if MobileBtn then
         MobileBtn.MouseButton1Click:Connect(function()
