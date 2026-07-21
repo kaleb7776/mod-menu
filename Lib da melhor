@@ -37,6 +37,16 @@ local Theme = {
 }
 
 -- ================================================================
+-- SONS PARA NOTIFICAÇÕES
+-- ================================================================
+local NotificationSounds = {
+    Success = "rbxassetid://9120396752",  -- Som de confirmação (ding)
+    Warning = "rbxassetid://9120397531",  -- Som de alerta
+    Error = "rbxassetid://9120397835",    -- Som de erro (buzzer)
+    Info = "rbxassetid://9120398201"      -- Som neutro (opcional)
+}
+
+-- ================================================================
 -- BIBLIOTECA PRINCIPAL
 -- ================================================================
 local Library = {
@@ -196,6 +206,26 @@ function Library:Notify(title, text, duration, notificationType)
     duration = duration or 3
     notificationType = notificationType or "Info"
     
+    -- ============================================================
+    -- TOCAR SOM (se existir)
+    -- ============================================================
+    local soundId = NotificationSounds[notificationType]
+    if soundId then
+        pcall(function()
+            local sound = Instance.new("Sound")
+            sound.SoundId = soundId
+            sound.Volume = 0.5
+            sound.Parent = NotificationGui or CoreGui
+            sound:Play()
+            task.delay(sound.TimeLength or 2, function()
+                pcall(sound.Destroy, sound)
+            end)
+        end)
+    end
+    
+    -- ============================================================
+    -- NOTIFICAÇÃO VISUAL (EXATAMENTE COMO VOCÊ QUER)
+    -- ============================================================
     local colors = {
         Info = Theme.Accent,
         Success = Theme.Success,
@@ -288,7 +318,7 @@ function Library:Confirm(title, message, callback)
         Name = "ConfirmOverlay",
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = Color3.new(0, 0, 0),
-        BackgroundTransparency = 0.5, -- Leve fundo escuro
+        BackgroundTransparency = 1, -- Leve fundo escuro
         ZIndex = 999,
         Parent = Library._ScreenGui
     })
@@ -311,7 +341,7 @@ function Library:Confirm(title, message, callback)
         Size = UDim2.new(1, -20, 0, 30),
         Position = UDim2.new(0, 10, 0, 10),
         BackgroundTransparency = 1,
-        Text = title or "⚠️ Confirmação",
+        Text = title or "Confirmação",
         TextColor3 = Theme.Text,
         TextSize = 18,
         Font = Enum.Font.GothamBold,
@@ -352,7 +382,7 @@ function Library:Confirm(title, message, callback)
         Size = UDim2.new(0, 130, 0, 38),
         Position = UDim2.new(0.5, -145, 1, -55),
         BackgroundColor3 = Theme.Success,
-        Text = "✔ Sim, encerrar",
+        Text = "Sim, encerrar",
         TextColor3 = Color3.new(1, 1, 1),
         TextSize = 14,
         Font = Enum.Font.GothamBold,
@@ -367,7 +397,7 @@ function Library:Confirm(title, message, callback)
         Size = UDim2.new(0, 130, 0, 38),
         Position = UDim2.new(0.5, 15, 1, -55),
         BackgroundColor3 = Theme.Error,
-        Text = "✖ Não, cancelar",
+        Text = "Não, cancelar",
         TextColor3 = Color3.new(1, 1, 1),
         TextSize = 14,
         Font = Enum.Font.GothamBold,
