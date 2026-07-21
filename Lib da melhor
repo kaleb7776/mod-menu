@@ -42,7 +42,12 @@ local Theme = {
 local Library = {
     Flags = {},
     Open = true,
-    Keybind = Enum.KeyCode.RightControl
+    Keybind = Enum.KeyCode.RightControl,
+    _ScreenGui = nil,        -- referência para a ScreenGui principal
+    _MainFrame = nil,
+    _MobileButton = nil,
+    _Footer = nil,
+    _NotificationGui = nil,
 }
 
 -- ================================================================
@@ -270,6 +275,143 @@ function Library:Notify(title, text, duration, notificationType)
 end
 
 -- ================================================================
+-- CAIXA DE CONFIRMAÇÃO V3 – TEXTO 100% VISÍVEL (CORRIGIDO)
+-- ================================================================
+function Library:Confirm(title, message, callback)
+    if not Library._ScreenGui then
+        warn("[Confirm] Nenhuma ScreenGui disponível.")
+        return
+    end
+
+    -- Overlay escurecido para destaque do modal
+    local overlay = Create("Frame", {
+        Name = "ConfirmOverlay",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 0.5, -- Leve fundo escuro
+        ZIndex = 999,
+        Parent = Library._ScreenGui
+    })
+
+    -- Diálogo principal
+    local dialog = Create("Frame", {
+        Name = "ConfirmDialog",
+        Size = UDim2.new(0, 440, 0, 280),
+        Position = UDim2.new(0.5, -220, 0.5, -140),
+        BackgroundColor3 = Theme.Background,
+        BorderSizePixel = 0,
+        ZIndex = 1000,
+        Parent = overlay
+    })
+    AddCorner(dialog, 12)
+    AddStroke(dialog, Theme.Border)
+
+    -- Título (ZIndex corrigido para 1001)
+    Create("TextLabel", {
+        Size = UDim2.new(1, -20, 0, 30),
+        Position = UDim2.new(0, 10, 0, 10),
+        BackgroundTransparency = 1,
+        Text = title or "⚠️ Confirmação",
+        TextColor3 = Theme.Text,
+        TextSize = 18,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 1001,
+        Parent = dialog
+    })
+
+    -- Linha divisória (ZIndex corrigido para 1001)
+    Create("Frame", {
+        Size = UDim2.new(1, -20, 0, 1),
+        Position = UDim2.new(0, 10, 0, 45),
+        BackgroundColor3 = Theme.Border,
+        BorderSizePixel = 0,
+        ZIndex = 1001,
+        Parent = dialog
+    })
+
+    -- Mensagem (ZIndex corrigido para 1001)
+    local msgLabel = Create("TextLabel", {
+        Size = UDim2.new(1, -30, 0, 130),
+        Position = UDim2.new(0, 15, 0, 55),
+        BackgroundTransparency = 1,
+        Text = message or "Tem certeza que deseja realizar esta ação?",
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 14,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextWrapped = true,
+        ZIndex = 1001,
+        Parent = dialog
+    })
+
+    -- Botão "Sim"
+    local yesBtn = Create("TextButton", {
+        Name = "Yes",
+        Size = UDim2.new(0, 130, 0, 38),
+        Position = UDim2.new(0.5, -145, 1, -55),
+        BackgroundColor3 = Theme.Success,
+        Text = "✔ Sim, encerrar",
+        TextColor3 = Color3.new(1, 1, 1),
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        ZIndex = 1001,
+        Parent = dialog
+    })
+    AddCorner(yesBtn, 8)
+
+    -- Botão "Não"
+    local noBtn = Create("TextButton", {
+        Name = "No",
+        Size = UDim2.new(0, 130, 0, 38),
+        Position = UDim2.new(0.5, 15, 1, -55),
+        BackgroundColor3 = Theme.Error,
+        Text = "✖ Não, cancelar",
+        TextColor3 = Color3.new(1, 1, 1),
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        ZIndex = 1001,
+        Parent = dialog
+    })
+    AddCorner(noBtn, 8)
+
+    -- Efeitos de Hover nos botões
+    yesBtn.MouseEnter:Connect(function()
+        Tween(yesBtn, 0.15, {BackgroundColor3 = Theme.Success:Lerp(Color3.new(1,1,1), 0.2)})
+    end)
+    yesBtn.MouseLeave:Connect(function()
+        Tween(yesBtn, 0.15, {BackgroundColor3 = Theme.Success})
+    end)
+    noBtn.MouseEnter:Connect(function()
+        Tween(noBtn, 0.15, {BackgroundColor3 = Theme.Error:Lerp(Color3.new(1,1,1), 0.2)})
+    end)
+    noBtn.MouseLeave:Connect(function()
+        Tween(noBtn, 0.15, {BackgroundColor3 = Theme.Error})
+    end)
+
+    -- Handlers dos botões
+    yesBtn.MouseButton1Click:Connect(function()
+        overlay:Destroy()
+        pcall(callback, true)
+    end)
+
+    noBtn.MouseButton1Click:Connect(function()
+        overlay:Destroy()
+        pcall(callback, false)
+    end)
+
+    overlay.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if input.Target == overlay then
+                overlay:Destroy()
+                pcall(callback, false)
+            end
+        end
+    end)
+end
+
+-- ================================================================
 -- FUNÇÃO PRINCIPAL: CRIAR JANELA
 -- ================================================================
 
@@ -325,7 +467,11 @@ function Library:CreateWindow(configuration, toggleKey)
     if not success then
         screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
-    
+
+    -- Guarda referências globais para a caixa de confirmação e fechamento
+    Library._ScreenGui = screenGui
+    Library._NotificationGui = NotificationGui
+
     -- ============================================================
     -- BOTÃO PARA MOBILE (FLUTUANTE)
     -- ============================================================
@@ -353,7 +499,8 @@ function Library:CreateWindow(configuration, toggleKey)
         image.ScaleType = Enum.ScaleType.Fit
         image.Parent = mobileButton
     end
-    
+    Library._MobileButton = mobileButton
+
     -- ============================================================
     -- DETERMINAR O TAMANHO DA JANELA (ESCALA OU OFFSET)
     -- ============================================================
@@ -396,7 +543,8 @@ function Library:CreateWindow(configuration, toggleKey)
     end
     AddCorner(mainFrame, 10)
     AddStroke(mainFrame, Theme.Border)
-    
+    Library._MainFrame = mainFrame
+
     -- ============================================================
     -- TOP BAR (BARRA SUPERIOR)
     -- ============================================================
@@ -521,7 +669,7 @@ function Library:CreateWindow(configuration, toggleKey)
         })
         
         -- ============================================================
-        -- BOTÃO FECHAR
+        -- BOTÃO FECHAR (com caixa de confirmação)
         -- ============================================================
         local closeButton = Create("TextButton", {
             Name = "Close",
@@ -536,17 +684,63 @@ function Library:CreateWindow(configuration, toggleKey)
         })
         if closeButton then
             AddCorner(closeButton, 6)
+
             closeButton.MouseButton1Click:Connect(function()
-                Library.Open = false
-                mainFrame.Visible = false
-                if IsMobile and mobileButton then
-                    mobileButton.Visible = true
-                end
+                -- Abre a caixa de confirmação
+                Library:Confirm(
+                    "🔒 Encerrar Interface",
+                    "Tem certeza que deseja encerrar a interface?\n\n" ..
+                    "Esta ação irá descarregar completamente todos os elementos visuais " ..
+                    "e funcionalidades da interface. Para reativá-la, será necessário " ..
+                    "executar novamente o script.\n\nDeseja continuar?",
+                    function(confirmed)
+                        if confirmed then
+                            -- Fecha e destrói tudo
+                            Library.Open = false
+                            mainFrame.Visible = false
+                            if IsMobile and mobileButton then
+                                mobileButton.Visible = false
+                            end
+                            if footer then footer.Visible = false end
+
+                            -- Destrói a ScreenGui principal
+                            if screenGui then
+                                screenGui:Destroy()
+                            end
+                            -- Destrói as notificações
+                            if NotificationGui then
+                                NotificationGui:Destroy()
+                            end
+
+                            -- Limpa flags e referências
+                            Library.Flags = {}
+                            Library._ScreenGui = nil
+                            Library._MainFrame = nil
+                            Library._MobileButton = nil
+                            Library._Footer = nil
+                            Library._NotificationGui = nil
+
+                            -- Notificação final (usando o sistema de notificações original, 
+                            -- mas como a GUI foi destruída, ela não será exibida. 
+                            -- Em vez disso, usamos StarterGui:SetCore se disponível.
+                            pcall(function()
+                                game:GetService("StarterGui"):SetCore("SendNotification", {
+                                    Title = "Interface Encerrada",
+                                    Text = "A interface foi completamente descarregada. Para reabrir, execute o script novamente.",
+                                    Duration = 4
+                                })
+                            end)
+                        else
+                            -- Cancelou: exibe notificação simples
+                            Library:Notify("Cancelado", "Operação cancelada. A interface permanece ativa.", 2, "Info")
+                        end
+                    end
+                )
             end)
         end
         
         -- ============================================================
-        -- BOTÃO MINIMIZAR
+        -- BOTÃO MINIMIZAR (agora fecha com notificação)
         -- ============================================================
         local minimizeButton = Create("TextButton", {
             Name = "Minimize",
@@ -561,29 +755,33 @@ function Library:CreateWindow(configuration, toggleKey)
         })
         if minimizeButton then
             AddCorner(minimizeButton, 6)
+
             minimizeButton.MouseButton1Click:Connect(function()
-                if mainFrame.Size.Y.Scale > 0.1 or mainFrame.Size.Y.Offset > 50 then
-                    -- Minimizar
-                    if useScale then
-                        Tween(mainFrame, 0.2, {
-                            Size = UDim2.new(scaleX or 0.7, 0, 0.05, 0),
-                            Position = UDim2.new(0.5, 0, 0.1, 0)
-                        })
-                    else
-                        Tween(mainFrame, 0.2, {
-                            Size = UDim2.new(0, mainFrame.Size.X.Offset, 0, 40),
-                            Position = UDim2.new(0.5, -mainFrame.Size.X.Offset/2, 0.1, 0)
-                        })
+                if mainFrame.Visible then
+                    -- Fechar menu (apenas ocultar, não destruir)
+                    mainFrame.Visible = false
+                    Library.Open = false
+
+                    if IsMobile and mobileButton then
+                        mobileButton.Visible = true
                     end
                     if footer then footer.Visible = false end
+
                     minimizeButton.Text = "+"
+
+                    local keyName = tostring(Library.Keybind):gsub("Enum.KeyCode.", "")
+                    local msg = IsMobile and "Clique no círculo flutuante para reabrir." or "Pressione a tecla " .. keyName .. " para reabrir."
+                    Library:Notify("Menu Fechado", msg, 4, "Info")
                 else
-                    -- Restaurar
-                    Tween(mainFrame, 0.2, {
-                        Size = mainSize,
-                        Position = UDim2.new(0.5, 0, 0.5, 0)
-                    })
+                    -- Reabrir menu
+                    mainFrame.Visible = true
+                    Library.Open = true
+
+                    if IsMobile and mobileButton then
+                        mobileButton.Visible = false
+                    end
                     if footer then footer.Visible = true end
+
                     minimizeButton.Text = "−"
                 end
             end)
@@ -640,9 +838,9 @@ function Library:CreateWindow(configuration, toggleKey)
         ClipsDescendants = true,
         Parent = mainFrame
     })
-    
+
     -- ============================================================
-    -- RODAPÉ (FOOTER) – ULTRA INFORMATIVO E ADAPTÁVEL
+    -- RODAPÉ (FOOTER) – MINIMALISTA (AVATAR + NOME + JOGO)
     -- ============================================================
     local footer = Create("Frame", {
         Name = "Footer",
@@ -657,7 +855,8 @@ function Library:CreateWindow(configuration, toggleKey)
             AddCorner(footer, 10)
             AddStroke(footer, Theme.Border)
         end)
-        
+        Library._Footer = footer
+
         local fixTop = Create("Frame", {
             Size = UDim2.new(1, 0, 0, 10),
             Position = UDim2.new(0, 0, 0, -10),
@@ -666,35 +865,14 @@ function Library:CreateWindow(configuration, toggleKey)
             Parent = footer
         })
         
-        -- Definição das colunas (proporções)
-        local columnWidths = {
-            avatar = 0.15,
-            game = 0.28,
-            executor = 0.25,
-            status = 0.20,
-            author = 0.12
-        }
-        
-        -- ============================================================
-        -- COLUNA 1: AVATAR + NOME + VIP
-        -- ============================================================
-        local column1 = Create("Frame", {
-            Size = UDim2.new(columnWidths.avatar, 0, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0),
-            BackgroundColor3 = Theme.Background,
-            BackgroundTransparency = 0.25,
-            BorderSizePixel = 0,
-            Parent = footer
-        })
-        pcall(function() AddCorner(column1, 8) end)
-        
+        -- Avatar
         local avatarSize = math.clamp(footerHeight * 0.6, 28, 36)
         local avatarImage = Create("ImageLabel", {
             Size = UDim2.new(0, avatarSize, 0, avatarSize),
-            Position = UDim2.new(0, 4, 0.5, -avatarSize/2),
+            Position = UDim2.new(0, 8, 0.5, -avatarSize/2),
             BackgroundColor3 = Theme.Element,
             BorderSizePixel = 0,
-            Parent = column1
+            Parent = footer
         })
         if avatarImage then
             pcall(function()
@@ -712,97 +890,35 @@ function Library:CreateWindow(configuration, toggleKey)
             end)
         end
         
-        local nameFontSize = math.clamp(footerHeight * 0.22, 10, 13)
+        -- Nome do jogador
+        local nameFontSize = math.clamp(footerHeight * 0.26, 12, 15)
         local nameLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(avatarSize + 6), 0, footerHeight * 0.5),
-            Position = UDim2.new(0, avatarSize + 6, 0, 2),
+            Size = UDim2.new(1, -(avatarSize + 16), 0, footerHeight * 0.5),
+            Position = UDim2.new(0, avatarSize + 14, 0, 2),
             BackgroundTransparency = 1,
             Text = (LocalPlayer and LocalPlayer.Name) or "??",
             TextColor3 = Theme.Text,
             TextSize = nameFontSize,
             Font = Enum.Font.GothamBold,
             TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column1
-        })
-        
-        local vipFontSize = math.clamp(footerHeight * 0.16, 8, 10)
-        local vipLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(avatarSize + 6), 0, footerHeight * 0.4),
-            Position = UDim2.new(0, avatarSize + 6, 0, footerHeight * 0.52),
-            BackgroundTransparency = 1,
-            Text = "✦ CLASSIC VIP ✦",
-            TextColor3 = Color3.fromRGB(255, 215, 0),
-            TextSize = vipFontSize,
-            Font = Enum.Font.GothamBold,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column1
-        })
-        
-        -- ============================================================
-        -- COLUNA 2: JOGO + THUMBNAIL
-        -- ============================================================
-        local column2 = Create("Frame", {
-            Size = UDim2.new(columnWidths.game, 0, 1, 0),
-            Position = UDim2.new(columnWidths.avatar, 0, 0, 0),
-            BackgroundColor3 = Theme.Background,
-            BackgroundTransparency = 0.15,
-            BorderSizePixel = 0,
             Parent = footer
         })
         
-        local thumbSize = math.clamp(footerHeight * 0.6, 28, 38)
-        local gameThumbnail = Create("ImageLabel", {
-            Size = UDim2.new(0, thumbSize, 0, thumbSize),
-            Position = UDim2.new(0, 4, 0.5, -thumbSize/2),
-            BackgroundColor3 = Theme.Element,
-            BorderSizePixel = 0,
-            Parent = column2
-        })
-        if gameThumbnail then
-            pcall(function()
-                local corner = Instance.new("UICorner")
-                corner.CornerRadius = UDim.new(0, 4)
-                corner.Parent = gameThumbnail
-                AddStroke(gameThumbnail, Theme.Border)
-                local placeId = game.PlaceId
-                gameThumbnail.Image = string.format(
-                    "https://www.roblox.com/asset-thumbnail/image?assetId=%d&width=72&height=72&format=png",
-                    placeId
-                )
-                gameThumbnail.Loaded:Connect(function()
-                    if gameThumbnail.Image and gameThumbnail.Image == "" then
-                        gameThumbnail.Image = "rbxassetid://150719181"
-                    end
-                end)
-            end)
-        end
-        
+        -- Nome do jogo (abaixo)
         local gameFontSize = math.clamp(footerHeight * 0.2, 10, 12)
         local gameNameLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(thumbSize + 6), 0, footerHeight * 0.5),
-            Position = UDim2.new(0, thumbSize + 6, 0, 2),
+            Size = UDim2.new(1, -(avatarSize + 16), 0, footerHeight * 0.4),
+            Position = UDim2.new(0, avatarSize + 14, 0, footerHeight * 0.52),
             BackgroundTransparency = 1,
-            Text = "Carregando...",
-            TextColor3 = Theme.Text,
-            TextSize = gameFontSize,
-            Font = Enum.Font.GothamBold,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column2
-        })
-        
-        local infoFontSize = math.clamp(footerHeight * 0.14, 8, 9)
-        local gameInfoLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(thumbSize + 6), 0, footerHeight * 0.4),
-            Position = UDim2.new(0, thumbSize + 6, 0, footerHeight * 0.52),
-            BackgroundTransparency = 1,
-            Text = "",
+            Text = "Carregando jogo...",
             TextColor3 = Theme.TextDark,
-            TextSize = infoFontSize,
+            TextSize = gameFontSize,
             Font = Enum.Font.Gotham,
             TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column2
+            Parent = footer
         })
         
+        -- Busca nome real do jogo
         task.spawn(function()
             pcall(function()
                 local marketplaceService = game:GetService("MarketplaceService")
@@ -815,255 +931,9 @@ function Library:CreateWindow(configuration, toggleKey)
                     gameNameLabel.Text = game.Name or "Jogo Desconhecido"
                 end
             end)
-            while wait(5) do
-                local playersCount = #Players:GetPlayers()
-                local version = (game:FindFirstChild("Version") and game.Version.Value) or "N/A"
-                gameInfoLabel.Text = string.format("ID: %d • v%s • %d online", game.PlaceId, version, playersCount)
-            end
         end)
         
-        -- ============================================================
-        -- COLUNA 3: EXECUTOR
-        -- ============================================================
-        local column3 = Create("Frame", {
-            Size = UDim2.new(columnWidths.executor, 0, 1, 0),
-            Position = UDim2.new(columnWidths.avatar + columnWidths.game, 0, 0, 0),
-            BackgroundColor3 = Theme.Background,
-            BackgroundTransparency = 0.15,
-            BorderSizePixel = 0,
-            Parent = footer
-        })
-        
-        local executorIconSize = math.clamp(footerHeight * 0.35, 14, 18)
-        local executorIcon = Create("TextLabel", {
-            Size = UDim2.new(0, executorIconSize, 1, 0),
-            BackgroundTransparency = 1,
-            Text = "⚡",
-            TextColor3 = Theme.Accent,
-            TextSize = executorIconSize,
-            Font = Enum.Font.SourceSansBold,
-            TextXAlignment = Enum.TextXAlignment.Center,
-            Parent = column3
-        })
-        
-        local executorFontSize = math.clamp(footerHeight * 0.18, 9, 11)
-        local executorNameLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(executorIconSize + 4), 0, footerHeight * 0.5),
-            Position = UDim2.new(0, executorIconSize + 4, 0, 2),
-            BackgroundTransparency = 1,
-            Text = "Executor: ...",
-            TextColor3 = Theme.Text,
-            TextSize = executorFontSize,
-            Font = Enum.Font.GothamBold,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column3
-        })
-        
-        local executorVersionFontSize = math.clamp(footerHeight * 0.14, 8, 9)
-        local executorVersionLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(executorIconSize + 4), 0, footerHeight * 0.4),
-            Position = UDim2.new(0, executorIconSize + 4, 0, footerHeight * 0.52),
-            BackgroundTransparency = 1,
-            Text = "",
-            TextColor3 = Theme.TextDark,
-            TextSize = executorVersionFontSize,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column3
-        })
-        
-        task.spawn(function()
-            pcall(function()
-                local executorName = "Desconhecido"
-                local executorVersion = ""
-                
-                if type(identifyexecutor) == "function" then
-                    local success, name, version = pcall(identifyexecutor)
-                    if success and name and name ~= "" then
-                        executorName = name
-                        executorVersion = version or ""
-                    end
-                end
-                
-                if executorName == "Desconhecido" then
-                    if type(syn) == "table" and syn and syn.request then
-                        executorName = "Synapse X"
-                        local success, version = pcall(function() return syn.version end)
-                        if success and version then executorVersion = version end
-                    elseif type(krnl) == "table" and krnl and krnl.loadfile then
-                        executorName = "Krnl"
-                        local success, version = pcall(function() return krnl.version end)
-                        if success and version then executorVersion = version end
-                    elseif type(script) == "table" and script.ExecutionEnvironment then
-                        local success, environment = pcall(script.ExecutionEnvironment)
-                        if success then executorName = environment end
-                    end
-                end
-                
-                if executorName == "Desconhecido" and type(getexecutorname) == "function" then
-                    local success, name = pcall(getexecutorname)
-                    if success and name then executorName = name end
-                end
-                
-                executorNameLabel.Text = "Executor: " .. executorName
-                if executorVersion ~= "" then
-                    executorVersionLabel.Text = "v" .. executorVersion
-                else
-                    local success, build = pcall(function() return game:GetService("Version") end)
-                    if success and build then
-                        executorVersionLabel.Text = "Build: " .. build
-                    else
-                        executorVersionLabel.Text = ""
-                    end
-                end
-            end)
-        end)
-        
-        -- ============================================================
-        -- COLUNA 4: STATUS (FPS, PING, HORA, MEMÓRIA)
-        -- ============================================================
-        local column4 = Create("Frame", {
-            Size = UDim2.new(columnWidths.status, 0, 1, 0),
-            Position = UDim2.new(columnWidths.avatar + columnWidths.game + columnWidths.executor, 0, 0, 0),
-            BackgroundColor3 = Theme.Background,
-            BackgroundTransparency = 0.15,
-            BorderSizePixel = 0,
-            Parent = footer
-        })
-        
-        local statusIconSize = math.clamp(footerHeight * 0.3, 12, 16)
-        local statusIcon = Create("TextLabel", {
-            Size = UDim2.new(0, statusIconSize, 1, 0),
-            BackgroundTransparency = 1,
-            Text = "▸",
-            TextColor3 = Theme.Accent,
-            TextSize = statusIconSize,
-            Font = Enum.Font.SourceSansBold,
-            TextXAlignment = Enum.TextXAlignment.Center,
-            Parent = column4
-        })
-        
-        local statusFontSize = math.clamp(footerHeight * 0.16, 9, 10)
-        local statusLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(statusIconSize + 4), 0, footerHeight * 0.5),
-            Position = UDim2.new(0, statusIconSize + 4, 0, 2),
-            BackgroundTransparency = 1,
-            Text = "FPS: -- Ping: --ms",
-            TextColor3 = Theme.Text,
-            TextSize = statusFontSize,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column4
-        })
-        
-        local extraStatusFontSize = math.clamp(footerHeight * 0.14, 8, 9)
-        local extraStatusLabel = Create("TextLabel", {
-            Size = UDim2.new(1, -(statusIconSize + 4), 0, footerHeight * 0.4),
-            Position = UDim2.new(0, statusIconSize + 4, 0, footerHeight * 0.52),
-            BackgroundTransparency = 1,
-            Text = "",
-            TextColor3 = Theme.TextDark,
-            TextSize = extraStatusFontSize,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = column4
-        })
-        
-        -- ============================================================
-        -- COLUNA 5: AUTOR
-        -- ============================================================
-        local column5 = Create("Frame", {
-            Size = UDim2.new(columnWidths.author, 0, 1, 0),
-            Position = UDim2.new(1 - columnWidths.author, 0, 0, 0),
-            BackgroundColor3 = Theme.Background,
-            BackgroundTransparency = 0.2,
-            BorderSizePixel = 0,
-            Parent = footer
-        })
-        
-        local authorLabel = Create("TextLabel", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1,
-            Text = windowAuthor ~= "" and windowAuthor or "Ravion UI",
-            TextColor3 = Theme.TextDark,
-            TextSize = 10,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Center,
-            TextYAlignment = Enum.TextYAlignment.Center,
-            Parent = column5
-        })
-        
-        -- ============================================================
-        -- LOOP DE ATUALIZAÇÃO (FPS, PING, HORA, MEMÓRIA)
-        -- ============================================================
-        task.spawn(function()
-            pcall(function()
-                local frameCounter = 0
-                local timeAccumulator = 0
-                local framesPerSecond = 0
-                local pingInMilliseconds = 0
-                
-                local function GetPing()
-                    local stats = game:GetService("Stats")
-                    local network = stats:FindFirstChild("Network")
-                    if network then
-                        local pingValue = network:FindFirstChild("Ping")
-                        if pingValue and pingValue.Value then
-                            return math.floor(pingValue.Value * 1000)
-                        end
-                    end
-                    local performance = stats:FindFirstChild("PerformanceStats")
-                    if performance then
-                        local pingValue = performance:FindFirstChild("Ping")
-                        if pingValue and pingValue.Value then
-                            return math.floor(pingValue.Value * 1000)
-                        end
-                    end
-                    for _, child in ipairs(stats:GetDescendants()) do
-                        if child.Name:lower():find("ping") and child:IsA("NumberValue") then
-                            return math.floor(child.Value * 1000)
-                        end
-                    end
-                    return 0
-                end
-                
-                local function GetMemoryUsage()
-                    local stats = game:GetService("Stats")
-                    local memory = stats:FindFirstChild("Memory")
-                    if memory then
-                        local memoryInMb = memory:FindFirstChild("MemoryUsedMb")
-                        if memoryInMb and memoryInMb.Value then
-                            return memoryInMb.Value
-                        end
-                    end
-                    return 0
-                end
-                
-                RunService.RenderStepped:Connect(function(deltaTime)
-                    pcall(function()
-                        frameCounter = frameCounter + 1
-                        timeAccumulator = timeAccumulator + deltaTime
-                        
-                        if timeAccumulator >= 0.5 then
-                            framesPerSecond = math.floor(frameCounter / timeAccumulator)
-                            frameCounter = 0
-                            timeAccumulator = 0
-                            pingInMilliseconds = GetPing()
-                        end
-                        
-                        statusLabel.Text = string.format("FPS: %d Ping: %dms", framesPerSecond, pingInMilliseconds)
-                        
-                        local currentTime = os.date("*t")
-                        local timeString = string.format("%02d:%02d:%02d", currentTime.hour, currentTime.min, currentTime.sec)
-                        local memory = GetMemoryUsage()
-                        local memoryString = (memory > 0) and string.format("%.1f MB", memory) or "-- MB"
-                        extraStatusLabel.Text = string.format("%s • %s", timeString, memoryString)
-                    end)
-                end)
-            end)
-        end)
-        
-        -- Separador superior do rodapé
+        -- Separador
         local separator = Create("Frame", {
             Size = UDim2.new(1, -20, 0, 1),
             Position = UDim2.new(0, 10, 0, -1),
@@ -1302,7 +1172,7 @@ function Library:CreateWindow(configuration, toggleKey)
             end
             
             -- ============================================================
-            -- ELEMENTOS DA SEÇÃO
+            -- ELEMENTOS DA SEÇÃO (mantidos iguais)
             -- ============================================================
             local sectionObject = {}
             
