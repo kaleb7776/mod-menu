@@ -1,9 +1,6 @@
 -- ================================================================
 -- RAVION UI – BIBLIOTECA COMPLETA V7 (SEM ABREVIAÇÕES)
 -- ================================================================
--- Desenvolvida para ser a mais completa e estável possível.
--- Compatível com executores modernos e antigos.
--- ================================================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -40,10 +37,10 @@ local Theme = {
 -- SONS PARA NOTIFICAÇÕES
 -- ================================================================
 local NotificationSounds = {
-    Success = "rbxassetid://9120396752",  -- Som de confirmação (ding)
-    Warning = "rbxassetid://9120397531",  -- Som de alerta
-    Error = "rbxassetid://9120397835",    -- Som de erro (buzzer)
-    Info = "rbxassetid://9120398201"      -- Som neutro (opcional)
+    Success = "rbxassetid://9120396752",
+    Warning = "rbxassetid://9120397531",
+    Error = "rbxassetid://9120397835",
+    Info = "rbxassetid://9120398201"
 }
 
 -- ================================================================
@@ -53,7 +50,7 @@ local Library = {
     Flags = {},
     Open = true,
     Keybind = Enum.KeyCode.RightControl,
-    _ScreenGui = nil,        -- referência para a ScreenGui principal
+    _ScreenGui = nil,
     _MainFrame = nil,
     _MobileButton = nil,
     _Footer = nil,
@@ -206,9 +203,7 @@ function Library:Notify(title, text, duration, notificationType)
     duration = duration or 3
     notificationType = notificationType or "Info"
     
-    -- ============================================================
-    -- TOCAR SOM (se existir)
-    -- ============================================================
+    -- Tocar som
     local soundId = NotificationSounds[notificationType]
     if soundId then
         pcall(function()
@@ -223,9 +218,6 @@ function Library:Notify(title, text, duration, notificationType)
         end)
     end
     
-    -- ============================================================
-    -- NOTIFICAÇÃO VISUAL (EXATAMENTE COMO VOCÊ QUER)
-    -- ============================================================
     local colors = {
         Info = Theme.Accent,
         Success = Theme.Success,
@@ -305,7 +297,7 @@ function Library:Notify(title, text, duration, notificationType)
 end
 
 -- ================================================================
--- CAIXA DE CONFIRMAÇÃO V3 – TEXTO 100% VISÍVEL (CORRIGIDO)
+-- CAIXA DE CONFIRMAÇÃO – SEM FUNDO CINZA E SEM EMOJIS
 -- ================================================================
 function Library:Confirm(title, message, callback)
     if not Library._ScreenGui then
@@ -313,17 +305,15 @@ function Library:Confirm(title, message, callback)
         return
     end
 
-    -- Overlay escurecido para destaque do modal
     local overlay = Create("Frame", {
         Name = "ConfirmOverlay",
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = Color3.new(0, 0, 0),
-        BackgroundTransparency = 1, -- Leve fundo escuro
+        BackgroundTransparency = 1,
         ZIndex = 999,
         Parent = Library._ScreenGui
     })
 
-    -- Diálogo principal
     local dialog = Create("Frame", {
         Name = "ConfirmDialog",
         Size = UDim2.new(0, 440, 0, 280),
@@ -336,7 +326,6 @@ function Library:Confirm(title, message, callback)
     AddCorner(dialog, 12)
     AddStroke(dialog, Theme.Border)
 
-    -- Título (ZIndex corrigido para 1001)
     Create("TextLabel", {
         Size = UDim2.new(1, -20, 0, 30),
         Position = UDim2.new(0, 10, 0, 10),
@@ -350,7 +339,6 @@ function Library:Confirm(title, message, callback)
         Parent = dialog
     })
 
-    -- Linha divisória (ZIndex corrigido para 1001)
     Create("Frame", {
         Size = UDim2.new(1, -20, 0, 1),
         Position = UDim2.new(0, 10, 0, 45),
@@ -360,7 +348,6 @@ function Library:Confirm(title, message, callback)
         Parent = dialog
     })
 
-    -- Mensagem (ZIndex corrigido para 1001)
     local msgLabel = Create("TextLabel", {
         Size = UDim2.new(1, -30, 0, 130),
         Position = UDim2.new(0, 15, 0, 55),
@@ -376,7 +363,6 @@ function Library:Confirm(title, message, callback)
         Parent = dialog
     })
 
-    -- Botão "Sim"
     local yesBtn = Create("TextButton", {
         Name = "Yes",
         Size = UDim2.new(0, 130, 0, 38),
@@ -391,7 +377,6 @@ function Library:Confirm(title, message, callback)
     })
     AddCorner(yesBtn, 8)
 
-    -- Botão "Não"
     local noBtn = Create("TextButton", {
         Name = "No",
         Size = UDim2.new(0, 130, 0, 38),
@@ -406,7 +391,6 @@ function Library:Confirm(title, message, callback)
     })
     AddCorner(noBtn, 8)
 
-    -- Efeitos de Hover nos botões
     yesBtn.MouseEnter:Connect(function()
         Tween(yesBtn, 0.15, {BackgroundColor3 = Theme.Success:Lerp(Color3.new(1,1,1), 0.2)})
     end)
@@ -420,7 +404,6 @@ function Library:Confirm(title, message, callback)
         Tween(noBtn, 0.15, {BackgroundColor3 = Theme.Error})
     end)
 
-    -- Handlers dos botões
     yesBtn.MouseButton1Click:Connect(function()
         overlay:Destroy()
         pcall(callback, true)
@@ -446,7 +429,6 @@ end
 -- ================================================================
 
 function Library:CreateWindow(configuration, toggleKey)
-    -- Suporte a dois formatos: string antiga ou tabela nova
     if type(configuration) == "string" then
         configuration = {
             Title = configuration,
@@ -467,9 +449,6 @@ function Library:CreateWindow(configuration, toggleKey)
     
     Library.Keybind = windowKeybind
     
-    -- ============================================================
-    -- LIMPEZA DE GUIAS ANTERIORES
-    -- ============================================================
     pcall(function()
         local oldGui = LocalPlayer.PlayerGui:FindFirstChild(windowFolder)
         if oldGui then oldGui:Destroy() end
@@ -479,9 +458,6 @@ function Library:CreateWindow(configuration, toggleKey)
         if oldCoreGui then oldCoreGui:Destroy() end
     end)
     
-    -- ============================================================
-    -- CRIAÇÃO DA SCREENGUI
-    -- ============================================================
     local screenGui = Create("ScreenGui", {
         Name = windowFolder,
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
@@ -498,13 +474,9 @@ function Library:CreateWindow(configuration, toggleKey)
         screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
 
-    -- Guarda referências globais para a caixa de confirmação e fechamento
     Library._ScreenGui = screenGui
     Library._NotificationGui = NotificationGui
 
-    -- ============================================================
-    -- BOTÃO PARA MOBILE (FLUTUANTE)
-    -- ============================================================
     local mobileButton = Create("TextButton", {
         Name = "MobileButton",
         Size = UDim2.new(0, 50, 0, 50),
@@ -531,9 +503,6 @@ function Library:CreateWindow(configuration, toggleKey)
     end
     Library._MobileButton = mobileButton
 
-    -- ============================================================
-    -- DETERMINAR O TAMANHO DA JANELA (ESCALA OU OFFSET)
-    -- ============================================================
     local useScale = true
     local scaleX = windowSize.X.Scale
     local scaleY = windowSize.Y.Scale
@@ -555,9 +524,6 @@ function Library:CreateWindow(configuration, toggleKey)
         mainSize = UDim2.new(0, width, 0, height)
     end
     
-    -- ============================================================
-    -- JANELA PRINCIPAL (MAIN)
-    -- ============================================================
     local mainFrame = Create("Frame", {
         Name = "Main",
         Size = mainSize,
@@ -575,9 +541,6 @@ function Library:CreateWindow(configuration, toggleKey)
     AddStroke(mainFrame, Theme.Border)
     Library._MainFrame = mainFrame
 
-    -- ============================================================
-    -- TOP BAR (BARRA SUPERIOR)
-    -- ============================================================
     local topBar = Create("Frame", {
         Name = "TopBar",
         Size = UDim2.new(1, 0, 0, 40),
@@ -597,9 +560,6 @@ function Library:CreateWindow(configuration, toggleKey)
         })
         MakeDraggable(topBar, mainFrame)
         
-        -- ============================================================
-        -- LOGO (ÍCONE OU IMAGEM)
-        -- ============================================================
         local logo = Create("Frame", {
             Name = "Logo",
             Size = UDim2.new(0, 28, 0, 28),
@@ -623,7 +583,6 @@ function Library:CreateWindow(configuration, toggleKey)
                     Parent = logo
                 })
             else
-                -- Tenta carregar imagem personalizada ou fallback
                 local imagePath = "ravion_logo.png"
                 local imageUrl = "https://i.postimg.cc/WbFVrmNQ/logo1-removebg-preview-(1).png"
                 local httpRequest = request or http_request or (syn and syn.request)
@@ -682,9 +641,6 @@ function Library:CreateWindow(configuration, toggleKey)
             end
         end
         
-        -- ============================================================
-        -- TÍTULO DA JANELA
-        -- ============================================================
         Create("TextLabel", {
             Name = "Title",
             Size = UDim2.new(0, 200, 1, 0),
@@ -698,9 +654,6 @@ function Library:CreateWindow(configuration, toggleKey)
             Parent = topBar
         })
         
-        -- ============================================================
-        -- BOTÃO FECHAR (com caixa de confirmação)
-        -- ============================================================
         local closeButton = Create("TextButton", {
             Name = "Close",
             Size = UDim2.new(0, 30, 0, 30),
@@ -716,16 +669,14 @@ function Library:CreateWindow(configuration, toggleKey)
             AddCorner(closeButton, 6)
 
             closeButton.MouseButton1Click:Connect(function()
-                -- Abre a caixa de confirmação
                 Library:Confirm(
-                    "🔒 Encerrar Interface",
+                    "Encerrar Interface",
                     "Tem certeza que deseja encerrar a interface?\n\n" ..
                     "Esta ação irá descarregar completamente todos os elementos visuais " ..
                     "e funcionalidades da interface. Para reativá-la, será necessário " ..
                     "executar novamente o script.\n\nDeseja continuar?",
                     function(confirmed)
                         if confirmed then
-                            -- Fecha e destrói tudo
                             Library.Open = false
                             mainFrame.Visible = false
                             if IsMobile and mobileButton then
@@ -733,16 +684,13 @@ function Library:CreateWindow(configuration, toggleKey)
                             end
                             if footer then footer.Visible = false end
 
-                            -- Destrói a ScreenGui principal
                             if screenGui then
                                 screenGui:Destroy()
                             end
-                            -- Destrói as notificações
                             if NotificationGui then
                                 NotificationGui:Destroy()
                             end
 
-                            -- Limpa flags e referências
                             Library.Flags = {}
                             Library._ScreenGui = nil
                             Library._MainFrame = nil
@@ -750,9 +698,6 @@ function Library:CreateWindow(configuration, toggleKey)
                             Library._Footer = nil
                             Library._NotificationGui = nil
 
-                            -- Notificação final (usando o sistema de notificações original, 
-                            -- mas como a GUI foi destruída, ela não será exibida. 
-                            -- Em vez disso, usamos StarterGui:SetCore se disponível.
                             pcall(function()
                                 game:GetService("StarterGui"):SetCore("SendNotification", {
                                     Title = "Interface Encerrada",
@@ -761,7 +706,6 @@ function Library:CreateWindow(configuration, toggleKey)
                                 })
                             end)
                         else
-                            -- Cancelou: exibe notificação simples
                             Library:Notify("Cancelado", "Operação cancelada. A interface permanece ativa.", 2, "Info")
                         end
                     end
@@ -769,9 +713,6 @@ function Library:CreateWindow(configuration, toggleKey)
             end)
         end
         
-        -- ============================================================
-        -- BOTÃO MINIMIZAR (agora fecha com notificação)
-        -- ============================================================
         local minimizeButton = Create("TextButton", {
             Name = "Minimize",
             Size = UDim2.new(0, 30, 0, 30),
@@ -788,7 +729,6 @@ function Library:CreateWindow(configuration, toggleKey)
 
             minimizeButton.MouseButton1Click:Connect(function()
                 if mainFrame.Visible then
-                    -- Fechar menu (apenas ocultar, não destruir)
                     mainFrame.Visible = false
                     Library.Open = false
 
@@ -803,7 +743,6 @@ function Library:CreateWindow(configuration, toggleKey)
                     local msg = IsMobile and "Clique no círculo flutuante para reabrir." or "Pressione a tecla " .. keyName .. " para reabrir."
                     Library:Notify("Menu Fechado", msg, 4, "Info")
                 else
-                    -- Reabrir menu
                     mainFrame.Visible = true
                     Library.Open = true
 
@@ -818,9 +757,6 @@ function Library:CreateWindow(configuration, toggleKey)
         end
     end
     
-    -- ============================================================
-    -- SIDEBAR (BARRA LATERAL)
-    -- ============================================================
     local sidebar = Create("Frame", {
         Name = "Sidebar",
         Size = UDim2.new(0, 140, 1, -(50 + footerHeight)),
@@ -857,9 +793,6 @@ function Library:CreateWindow(configuration, toggleKey)
         end
     end
     
-    -- ============================================================
-    -- ÁREA DE CONTEÚDO
-    -- ============================================================
     local contentArea = Create("Frame", {
         Name = "ContentArea",
         Size = UDim2.new(1, -155, 1, -(50 + footerHeight)),
@@ -869,9 +802,6 @@ function Library:CreateWindow(configuration, toggleKey)
         Parent = mainFrame
     })
 
-    -- ============================================================
-    -- RODAPÉ (FOOTER) – MINIMALISTA (AVATAR + NOME + JOGO)
-    -- ============================================================
     local footer = Create("Frame", {
         Name = "Footer",
         Size = UDim2.new(1, 0, 0, footerHeight),
@@ -895,7 +825,6 @@ function Library:CreateWindow(configuration, toggleKey)
             Parent = footer
         })
         
-        -- Avatar
         local avatarSize = math.clamp(footerHeight * 0.6, 28, 36)
         local avatarImage = Create("ImageLabel", {
             Size = UDim2.new(0, avatarSize, 0, avatarSize),
@@ -920,7 +849,6 @@ function Library:CreateWindow(configuration, toggleKey)
             end)
         end
         
-        -- Nome do jogador
         local nameFontSize = math.clamp(footerHeight * 0.26, 12, 15)
         local nameLabel = Create("TextLabel", {
             Size = UDim2.new(1, -(avatarSize + 16), 0, footerHeight * 0.5),
@@ -934,7 +862,6 @@ function Library:CreateWindow(configuration, toggleKey)
             Parent = footer
         })
         
-        -- Nome do jogo (abaixo)
         local gameFontSize = math.clamp(footerHeight * 0.2, 10, 12)
         local gameNameLabel = Create("TextLabel", {
             Size = UDim2.new(1, -(avatarSize + 16), 0, footerHeight * 0.4),
@@ -948,7 +875,6 @@ function Library:CreateWindow(configuration, toggleKey)
             Parent = footer
         })
         
-        -- Busca nome real do jogo
         task.spawn(function()
             pcall(function()
                 local marketplaceService = game:GetService("MarketplaceService")
@@ -963,7 +889,6 @@ function Library:CreateWindow(configuration, toggleKey)
             end)
         end)
         
-        -- Separador
         local separator = Create("Frame", {
             Size = UDim2.new(1, -20, 0, 1),
             Position = UDim2.new(0, 10, 0, -1),
@@ -973,9 +898,6 @@ function Library:CreateWindow(configuration, toggleKey)
         })
     end
     
-    -- ============================================================
-    -- CONTROLES MOBILE E TECLADO
-    -- ============================================================
     if mobileButton then
         mobileButton.MouseButton1Click:Connect(function()
             Library.Open = true
@@ -999,9 +921,6 @@ function Library:CreateWindow(configuration, toggleKey)
         mobileButton.Visible = true
     end
     
-    -- ============================================================
-    -- SISTEMA DE ABAS
-    -- ============================================================
     local tabs = {}
     local currentTab = nil
     local windowObject = {}
@@ -1023,6 +942,20 @@ function Library:CreateWindow(configuration, toggleKey)
         })
         if not tabButton then return nil end
         AddCorner(tabButton, 6)
+        
+        -- ============================================================
+        -- INDICADOR (BOLINHA BRANCA) – NOVO!
+        -- ============================================================
+        local indicator = Create("Frame", {
+            Name = "Indicator",
+            Size = UDim2.new(0, 8, 0, 8),
+            Position = UDim2.new(1, -16, 0.5, -4),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BorderSizePixel = 0,
+            Visible = false,
+            Parent = tabButton
+        })
+        AddCorner(indicator, 4)
         
         local iconLabel = nil
         if tabIcon ~= "" then
@@ -1089,14 +1022,17 @@ function Library:CreateWindow(configuration, toggleKey)
             Button = tabButton,
             Page = tabPage,
             Label = tabLabel,
-            Icon = iconLabel
+            Icon = iconLabel,
+            Indicator = indicator
         }
         
         if currentTab == nil then
             currentTab = tabName
             tabPage.Visible = true
-            tabButton.BackgroundTransparency = 0
-            tabButton.BackgroundColor3 = Theme.Accent
+            -- AGORA A TAB FICA TRANSPARENTE, SÓ A BOLINHA APARECE
+            tabButton.BackgroundTransparency = 1
+            tabButton.BackgroundColor3 = Theme.Sidebar
+            if indicator then indicator.Visible = true end
             if tabLabel then tabLabel.TextColor3 = Color3.new(1, 1, 1) end
             if iconLabel then iconLabel.TextColor3 = Color3.new(1, 1, 1) end
         end
@@ -1108,13 +1044,15 @@ function Library:CreateWindow(configuration, toggleKey)
                 local oldTab = tabs[currentTab]
                 if oldTab.Page then oldTab.Page.Visible = false end
                 if oldTab.Button then Tween(oldTab.Button, 0.2, {BackgroundTransparency = 1}) end
+                if oldTab.Indicator then oldTab.Indicator.Visible = false end
                 if oldTab.Label then Tween(oldTab.Label, 0.2, {TextColor3 = Theme.TextDark}) end
                 if oldTab.Icon then Tween(oldTab.Icon, 0.2, {TextColor3 = Theme.TextDark}) end
             end
             
             currentTab = tabName
             tabPage.Visible = true
-            Tween(tabButton, 0.2, {BackgroundTransparency = 0, BackgroundColor3 = Theme.Accent})
+            Tween(tabButton, 0.2, {BackgroundTransparency = 1})
+            if indicator then indicator.Visible = true end
             if tabLabel then Tween(tabLabel, 0.2, {TextColor3 = Color3.new(1, 1, 1)}) end
             if iconLabel then Tween(iconLabel, 0.2, {TextColor3 = Color3.new(1, 1, 1)}) end
         end)
@@ -1130,9 +1068,6 @@ function Library:CreateWindow(configuration, toggleKey)
             end
         end)
         
-        -- ============================================================
-        -- OBJETO DA ABA
-        -- ============================================================
         local tabObject = {}
         
         function tabObject:AddSection(sectionName)
@@ -1201,12 +1136,8 @@ function Library:CreateWindow(configuration, toggleKey)
                 end
             end
             
-            -- ============================================================
-            -- ELEMENTOS DA SEÇÃO (mantidos iguais)
-            -- ============================================================
             local sectionObject = {}
             
-            -- LABEL
             function sectionObject:AddLabel(text)
                 text = text or "Label"
                 local label = Create("TextLabel", {
@@ -1227,7 +1158,6 @@ function Library:CreateWindow(configuration, toggleKey)
                 return object
             end
             
-            -- BUTTON
             function sectionObject:AddButton(text, callback)
                 text = text or "Button"
                 callback = callback or function() end
@@ -1286,7 +1216,6 @@ function Library:CreateWindow(configuration, toggleKey)
                 return object
             end
             
-            -- TOGGLE
             function sectionObject:AddToggle(text, defaultValue, flag, callback)
                 text = text or "Toggle"
                 defaultValue = defaultValue or false
@@ -1376,7 +1305,6 @@ function Library:CreateWindow(configuration, toggleKey)
                 return object
             end
             
-            -- SLIDER
             function sectionObject:AddSlider(text, minimum, maximum, defaultValue, flag, callback)
                 text = text or "Slider"
                 minimum = minimum or 0
@@ -1496,7 +1424,6 @@ function Library:CreateWindow(configuration, toggleKey)
                 return object
             end
             
-            -- TEXTBOX
             function sectionObject:AddTextbox(placeholder, flag, callback)
                 placeholder = placeholder or "Digite algo..."
                 callback = callback or function() end
@@ -1544,7 +1471,6 @@ function Library:CreateWindow(configuration, toggleKey)
                 return object
             end
             
-            -- DROPDOWN
             function sectionObject:AddDropdown(text, options, defaultOption, flag, callback)
                 text = text or "Dropdown"
                 options = options or {}
@@ -1744,13 +1670,18 @@ function Library:CreateWindow(configuration, toggleKey)
                 return object
             end
             
-            -- KEYBIND
-            function sectionObject:AddKeybind(text, defaultKey, flag, callback)
+            -- ============================================================
+            -- KEYBIND ATUALIZADO – SUPORTA HOLD E BOTÕES DE MOUSE
+            -- ============================================================
+            function sectionObject:AddKeybind(text, defaultKey, flag, callback, hold)
                 text = text or "Keybind"
                 defaultKey = defaultKey or Enum.KeyCode.None
                 callback = callback or function() end
+                hold = hold or false
                 local key = defaultKey
                 local isListening = false
+                local isHolding = false
+                local holdConnection = nil
                 
                 local keybindFrame = Create("TextButton", {
                     Name = "Keybind",
@@ -1800,8 +1731,12 @@ function Library:CreateWindow(configuration, toggleKey)
                     
                     local connection
                     connection = UserInputService.InputBegan:Connect(function(input)
-                        if input.UserInputType == Enum.UserInputType.Keyboard then
-                            key = input.KeyCode
+                        -- Aceita tanto teclado quanto mouse
+                        if input.UserInputType == Enum.UserInputType.Keyboard or 
+                           input.UserInputType == Enum.UserInputType.MouseButton1 or
+                           input.UserInputType == Enum.UserInputType.MouseButton2 or
+                           input.UserInputType == Enum.UserInputType.MouseButton3 then
+                            key = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode or input.UserInputType
                             if keyLabel then
                                 keyLabel.Text = key.Name
                                 Tween(keyLabel, 0.15, {BackgroundColor3 = Theme.SliderBg})
@@ -1821,10 +1756,36 @@ function Library:CreateWindow(configuration, toggleKey)
                     Tween(keybindFrame, 0.15, {BackgroundColor3 = Theme.Element})
                 end)
                 
+                -- ============================================================
+                -- LÓGICA DE HOLD E DETECÇÃO (TECLADO E MOUSE)
+                -- ============================================================
                 UserInputService.InputBegan:Connect(function(input, gameProcessed)
                     if gameProcessed or isListening then return end
-                    if input.KeyCode == key then
-                        pcall(callback)
+                    local inputKey = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode or input.UserInputType
+                    if inputKey == key then
+                        if hold then
+                            isHolding = true
+                            if holdConnection then holdConnection:Disconnect() end
+                            holdConnection = RunService.Heartbeat:Connect(function()
+                                if isHolding then
+                                    pcall(callback)
+                                end
+                            end)
+                        else
+                            pcall(callback)
+                        end
+                    end
+                end)
+                
+                UserInputService.InputEnded:Connect(function(input, gameProcessed)
+                    if gameProcessed then return end
+                    local inputKey = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode or input.UserInputType
+                    if inputKey == key and hold then
+                        isHolding = false
+                        if holdConnection then
+                            holdConnection:Disconnect()
+                            holdConnection = nil
+                        end
                     end
                 end)
                 
@@ -1844,7 +1805,6 @@ function Library:CreateWindow(configuration, toggleKey)
                 return object
             end
             
-            -- COLOR PICKER
             function sectionObject:AddColorPicker(text, defaultColor, flag, callback)
                 text = text or "Color"
                 defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
