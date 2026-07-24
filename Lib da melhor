@@ -1,5 +1,5 @@
 -- ================================================================
--- RAVION UI – BIBLIOTECA COMPLETA V8 (FINAL)
+-- RAVION UI – BIBLIOTECA COMPLETA V8 (FINAL) COM NEBULA ICONS
 -- ================================================================
 -- Desenvolvida para ser a mais completa e estável possível.
 -- Compatível com executores modernos e antigos.
@@ -45,6 +45,26 @@ local NotificationSounds = {
     Error = "rbxassetid://9120397835",
     Info = "rbxassetid://9120398201"
 }
+
+-- ================================================================
+-- NEBULA ICONS (CARREGAMENTO AUTOMÁTICO E SEGURO)
+-- ================================================================
+local NebulaIcons = nil
+local function LoadNebulaIcons()
+    if NebulaIcons ~= nil then return NebulaIcons end
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/nebula-icon-library-loader"))()
+    end)
+    if success and result then
+        NebulaIcons = result
+        print("[Ravion] Nebula Icons carregado com sucesso!")
+    else
+        warn("[Ravion] Falha ao carregar Nebula Icons. Usando fallback de texto.")
+        NebulaIcons = false
+    end
+    return NebulaIcons
+end
+LoadNebulaIcons()
 
 -- ================================================================
 -- BIBLIOTECA PRINCIPAL
@@ -425,6 +445,19 @@ function Library:Confirm(title, message, callback)
             end
         end
     end)
+end
+
+-- ================================================================
+-- MÉTODO PARA OBTER ÍCONES DA NEBULA (FACILITADOR)
+-- ================================================================
+function Library:GetIcon(name, pack)
+    if not NebulaIcons then
+        LoadNebulaIcons()
+    end
+    if NebulaIcons then
+        return NebulaIcons:GetIcon(name, pack)
+    end
+    return nil
 end
 
 -- ================================================================
@@ -1365,7 +1398,7 @@ function Library:CreateWindow(configuration, toggleKey)
         AddCorner(tabButton, 6)
         
         -- ============================================================
-        -- INDICADOR (BOLINHA BRANCA) – NOVO!
+        -- INDICADOR (BOLINHA BRANCA)
         -- ============================================================
         local indicator = Create("Frame", {
             Name = "Indicator",
@@ -1378,19 +1411,45 @@ function Library:CreateWindow(configuration, toggleKey)
         })
         AddCorner(indicator, 4)
         
+        -- ============================================================
+        -- ÍCONE DA ABA (SUPORTA IMAGEM E TEXTO)
+        -- ============================================================
         local iconLabel = nil
         if tabIcon ~= "" then
-            iconLabel = Create("TextLabel", {
-                Name = "Icon",
-                Size = UDim2.new(0, 25, 1, 0),
-                Position = UDim2.new(0, 5, 0, 0),
-                BackgroundTransparency = 1,
-                Text = tabIcon,
-                TextColor3 = Theme.TextDark,
-                TextSize = 14,
-                Font = Enum.Font.Gotham,
-                Parent = tabButton
-            })
+            -- Verifica se é um asset ID (número ou string começando com "rbxassetid://")
+            local isAssetId = (type(tabIcon) == "number") or 
+                              (type(tabIcon) == "string" and string.match(tabIcon, "^rbxassetid://"))
+            if isAssetId then
+                -- Cria ImageLabel para o ícone
+                iconLabel = Create("ImageLabel", {
+                    Name = "Icon",
+                    Size = UDim2.new(0, 20, 0, 20),
+                    Position = UDim2.new(0, 5, 0.5, -10),
+                    BackgroundTransparency = 1,
+                    Image = (type(tabIcon) == "number") and "rbxassetid://" .. tabIcon or tabIcon,
+                    ScaleType = Enum.ScaleType.Fit,
+                    Parent = tabButton
+                })
+                -- Ajusta a posição do texto da aba para não sobrepor
+                local label = tabButton:FindFirstChild("Label")
+                if label then
+                    label.Position = UDim2.new(0, 30, 0, 0)
+                    label.Size = UDim2.new(1, -40, 1, 0)
+                end
+            else
+                -- Texto normal (fallback para emojis ou caracteres)
+                iconLabel = Create("TextLabel", {
+                    Name = "Icon",
+                    Size = UDim2.new(0, 25, 1, 0),
+                    Position = UDim2.new(0, 5, 0, 0),
+                    BackgroundTransparency = 1,
+                    Text = tabIcon,
+                    TextColor3 = Theme.TextDark,
+                    TextSize = 14,
+                    Font = Enum.Font.Gotham,
+                    Parent = tabButton
+                })
+            end
         end
         
         local tabLabel = Create("TextLabel", {
@@ -1450,12 +1509,18 @@ function Library:CreateWindow(configuration, toggleKey)
         if currentTab == nil then
             currentTab = tabName
             tabPage.Visible = true
-            -- AGORA A TAB FICA TRANSPARENTE, SÓ A BOLINHA APARECE
+            -- A TAB FICA TRANSPARENTE, SÓ A BOLINHA APARECE
             tabButton.BackgroundTransparency = 1
             tabButton.BackgroundColor3 = Theme.Sidebar
             if indicator then indicator.Visible = true end
             if tabLabel then tabLabel.TextColor3 = Color3.new(1, 1, 1) end
-            if iconLabel then iconLabel.TextColor3 = Color3.new(1, 1, 1) end
+            if iconLabel then 
+                if iconLabel:IsA("ImageLabel") then
+                    -- Não mexe na cor da imagem
+                else
+                    iconLabel.TextColor3 = Color3.new(1, 1, 1)
+                end
+            end
         end
         
         tabButton.MouseButton1Click:Connect(function()
@@ -1467,7 +1532,13 @@ function Library:CreateWindow(configuration, toggleKey)
                 if oldTab.Button then Tween(oldTab.Button, 0.2, {BackgroundTransparency = 1}) end
                 if oldTab.Indicator then oldTab.Indicator.Visible = false end
                 if oldTab.Label then Tween(oldTab.Label, 0.2, {TextColor3 = Theme.TextDark}) end
-                if oldTab.Icon then Tween(oldTab.Icon, 0.2, {TextColor3 = Theme.TextDark}) end
+                if oldTab.Icon then
+                    if oldTab.Icon:IsA("ImageLabel") then
+                        -- Não mexe na imagem
+                    else
+                        Tween(oldTab.Icon, 0.2, {TextColor3 = Theme.TextDark})
+                    end
+                end
             end
             
             currentTab = tabName
@@ -1475,7 +1546,13 @@ function Library:CreateWindow(configuration, toggleKey)
             Tween(tabButton, 0.2, {BackgroundTransparency = 1})
             if indicator then indicator.Visible = true end
             if tabLabel then Tween(tabLabel, 0.2, {TextColor3 = Color3.new(1, 1, 1)}) end
-            if iconLabel then Tween(iconLabel, 0.2, {TextColor3 = Color3.new(1, 1, 1)}) end
+            if iconLabel then
+                if iconLabel:IsA("ImageLabel") then
+                    -- Não mexe na imagem
+                else
+                    Tween(iconLabel, 0.2, {TextColor3 = Color3.new(1, 1, 1)})
+                end
+            end
         end)
         
         tabButton.MouseEnter:Connect(function()
