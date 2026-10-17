@@ -1,12 +1,12 @@
 -- ================================================================
--- RAVION UI – SKECH (FULL BLINDADO / ANTI-BAN)
+-- RAVION UI – TEMA SKECH (FULL BLINDADO + PROTEGIDO)
 -- ================================================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
--- PROTEÇÃO: Cloneref no CoreGui para esconder do anticheat
+-- PROTEÇÃO: Cloneref no CoreGui
 local CoreGui = cloneref and cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local IsMobile = UserInputService.TouchEnabled
@@ -31,7 +31,7 @@ local Theme = {
     Error = Color3.fromRGB(255, 80, 80)
 }
 
--- Funções com pcall para evitar erros no console (ScriptContext.Error)
+-- PROTEÇÃO: Pcall em toda criação
 local function Create(class, properties)
     local success, instance = pcall(Instance.new, class)
     if not success or not instance then return nil end
@@ -98,32 +98,40 @@ local function MakeDraggable(handle, frame)
             if isDragging and input == dragInput then
                 local delta = input.Position - dragStartPosition
                 local newPosition = UDim2.new(startPosition.X.Scale, startPosition.X.Offset + delta.X, startPosition.Y.Scale, startPosition.Y.Offset + delta.Y)
-                Tween(frame, 0.1, {Position = newPosition})
+                pcall(function() frame.Position = newPosition end)
             end
         end)
     end)
 end
 
--- ================================================================
--- NOTIFICAÇÕES BLINDADAS
--- ================================================================
 local NotificationGui = nil
 local NotificationHolder = nil
 
-local function SetupNotifications()
-    -- PROTEÇÃO: Nome "\0" para burlar o detector do anticheat
+pcall(function()
+    -- PROTEÇÃO: Nome "\0" no NotificationGui
     NotificationGui = Create("ScreenGui", { Name = "\0", ZIndexBehavior = Enum.ZIndexBehavior.Global, ResetOnSpawn = false })
     if NotificationGui then
         local success = pcall(function() NotificationGui.Parent = CoreGui end)
         if not success then pcall(function() NotificationGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end) end
         
+        -- PROTEÇÃO: Nome "\0"
         NotificationHolder = Create("Frame", { Name = "\0", Size = UDim2.new(0, 300, 1, -40), Position = UDim2.new(1, -310, 0, 20), BackgroundTransparency = 1, Parent = NotificationGui })
         if NotificationHolder then
             Create("UIListLayout", { Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Bottom, SortOrder = Enum.SortOrder.LayoutOrder, Parent = NotificationHolder })
         end
     end
-end
-pcall(SetupNotifications)
+end)
+
+local Library = {
+    Flags = {},
+    Open = true,
+    Keybind = Enum.KeyCode.RightControl,
+    _ScreenGui = nil,
+    _MainFrame = nil,
+    _MobileButton = nil,
+    _Footer = nil,
+    _NotificationGui = NotificationGui,
+}
 
 function Library:Notify(title, text, duration, notificationType)
     pcall(function()
@@ -132,14 +140,15 @@ function Library:Notify(title, text, duration, notificationType)
         notificationType = notificationType or "Info"
         
         local colors = { Info = Theme.Accent, Success = Theme.Success, Warning = Theme.Warning, Error = Theme.Error }
-        local notification = Create("Frame", { Size = UDim2.new(1, 0, 0, 70), BackgroundColor3 = Theme.Section, Parent = NotificationHolder })
+        -- PROTEÇÃO: Nome "\0"
+        local notification = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 70), BackgroundColor3 = Theme.Section, Parent = NotificationHolder })
         if not notification then return end
         
         AddCorner(notification, 8); AddStroke(notification, Theme.Border)
-        Create("Frame", { Size = UDim2.new(0, 4, 1, -10), Position = UDim2.new(0, 5, 0, 5), BackgroundColor3 = colors[notificationType] or Theme.Accent, BorderSizePixel = 0, Parent = notification })
-        Create("TextLabel", { Size = UDim2.new(1, -50, 0, 22), Position = UDim2.new(0, 18, 0, 8), BackgroundTransparency = 1, Text = title or "Notificação", TextColor3 = Theme.Text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, Parent = notification })
-        Create("TextLabel", { Size = UDim2.new(1, -25, 0, 32), Position = UDim2.new(0, 18, 0, 30), BackgroundTransparency = 1, Text = text or "", TextColor3 = Theme.TextDark, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, Parent = notification })
-        local progressBar = Create("Frame", { Size = UDim2.new(1, 0, 0, 3), Position = UDim2.new(0, 0, 1, -3), BackgroundColor3 = colors[notificationType] or Theme.Accent, BorderSizePixel = 0, Parent = notification })
+        Create("Frame", { Name = "\0", Size = UDim2.new(0, 4, 1, -10), Position = UDim2.new(0, 5, 0, 5), BackgroundColor3 = colors[notificationType] or Theme.Accent, BorderSizePixel = 0, Parent = notification })
+        Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -50, 0, 22), Position = UDim2.new(0, 18, 0, 8), BackgroundTransparency = 1, Text = title or "Notificação", TextColor3 = Theme.Text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, Parent = notification })
+        Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -25, 0, 32), Position = UDim2.new(0, 18, 0, 30), BackgroundTransparency = 1, Text = text or "", TextColor3 = Theme.TextDark, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, Parent = notification })
+        local progressBar = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 3), Position = UDim2.new(0, 0, 1, -3), BackgroundColor3 = colors[notificationType] or Theme.Accent, BorderSizePixel = 0, Parent = notification })
         
         notification.Position = UDim2.new(1, 20, 0, 0)
         Tween(notification, 0.3, {Position = UDim2.new(0, 0, 0, 0)})
@@ -157,47 +166,88 @@ function Library:Notify(title, text, duration, notificationType)
     end)
 end
 
--- ================================================================
--- FUNÇÃO PRINCIPAL BLINDADA
--- ================================================================
+function Library:Confirm(title, message, callback)
+    pcall(function()
+        if not Library._ScreenGui then return end
+        local overlay = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, ZIndex = 999, Parent = Library._ScreenGui })
+        local dialog = Create("Frame", { Name = "\0", Size = UDim2.new(0, 440, 0, 280), Position = UDim2.new(0.5, -220, 0.5, -140), BackgroundColor3 = Theme.Background, BorderSizePixel = 0, ZIndex = 1000, Parent = overlay })
+        AddCorner(dialog, 12); AddStroke(dialog, Theme.Border)
+        
+        Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -20, 0, 30), Position = UDim2.new(0, 10, 0, 10), BackgroundTransparency = 1, Text = title or "Confirmação", TextColor3 = Theme.Text, TextSize = 18, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 1001, Parent = dialog })
+        Create("Frame", { Name = "\0", Size = UDim2.new(1, -20, 0, 1), Position = UDim2.new(0, 10, 0, 45), BackgroundColor3 = Theme.Border, BorderSizePixel = 0, ZIndex = 1001, Parent = dialog })
+        Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -30, 0, 130), Position = UDim2.new(0, 15, 0, 55), BackgroundTransparency = 1, Text = message or "Tem certeza?", TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 14, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, TextWrapped = true, ZIndex = 1001, Parent = dialog })
+        
+        local yesBtn = Create("TextButton", { Name = "\0", Size = UDim2.new(0, 130, 0, 38), Position = UDim2.new(0.5, -145, 1, -55), BackgroundColor3 = Theme.Success, Text = "Sim, encerrar", TextColor3 = Color3.new(1, 1, 1), TextSize = 14, Font = Enum.Font.GothamBold, ZIndex = 1001, Parent = dialog })
+        AddCorner(yesBtn, 8)
+        local noBtn = Create("TextButton", { Name = "\0", Size = UDim2.new(0, 130, 0, 38), Position = UDim2.new(0.5, 15, 1, -55), BackgroundColor3 = Theme.Error, Text = "Não, cancelar", TextColor3 = Color3.new(1, 1, 1), TextSize = 14, Font = Enum.Font.GothamBold, ZIndex = 1001, Parent = dialog })
+        AddCorner(noBtn, 8)
+        
+        pcall(function()
+            yesBtn.MouseEnter:Connect(function() Tween(yesBtn, 0.15, {BackgroundColor3 = Theme.Success:Lerp(Color3.new(1,1,1), 0.2)}) end)
+            yesBtn.MouseLeave:Connect(function() Tween(yesBtn, 0.15, {BackgroundColor3 = Theme.Success}) end)
+            noBtn.MouseEnter:Connect(function() Tween(noBtn, 0.15, {BackgroundColor3 = Theme.Error:Lerp(Color3.new(1,1,1), 0.2)}) end)
+            noBtn.MouseLeave:Connect(function() Tween(noBtn, 0.15, {BackgroundColor3 = Theme.Error}) end)
+            
+            yesBtn.MouseButton1Click:Connect(function() overlay:Destroy(); pcall(callback, true) end)
+            noBtn.MouseButton1Click:Connect(function() overlay:Destroy(); pcall(callback, false) end)
+            overlay.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 and input.Target == overlay then overlay:Destroy(); pcall(callback, false) end end)
+        end)
+    end)
+end
+
 function Library:CreateWindow(configuration, toggleKey)
     if type(configuration) == "string" then configuration = { Title = configuration, ToggleKey = toggleKey } end
     configuration = configuration or {}
     
-    local windowTitle = configuration.Title or "SKECH"
+    local windowTitle = configuration.Title or "SKECH[beta]"
     local windowKeybind = configuration.ToggleKey or Enum.KeyCode.RightControl
+    local windowSize = configuration.Size or UDim2.new(0, 600, 0, 400)
     Library.Keybind = windowKeybind
     
-    -- PROTEÇÃO: Nome "\0" para não ser detectado pela whitelist do anticheat
+    pcall(function()
+        local oldGui = LocalPlayer.PlayerGui:FindFirstChild("RavionUI")
+        if oldGui then oldGui:Destroy() end
+    end)
+    pcall(function()
+        local oldCoreGui = CoreGui:FindFirstChild("RavionUI")
+        if oldCoreGui then oldCoreGui:Destroy() end
+    end)
+    
+    -- PROTEÇÃO: Nome "\0"
     local screenGui = Create("ScreenGui", { Name = "\0", ZIndexBehavior = Enum.ZIndexBehavior.Global, ResetOnSpawn = false })
     if not screenGui then return nil end
-    
     local success = pcall(function() screenGui.Parent = CoreGui end)
     if not success then pcall(function() screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end) end
-    
     Library._ScreenGui = screenGui
     
-    local mainFrame = Create("Frame", { Name = "\0", Size = UDim2.new(0, 600, 0, 400), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Theme.Background, BorderSizePixel = 0, Parent = screenGui })
+    local mainSize = UDim2.new(0, math.clamp(windowSize.X.Offset, 400, 1000), 0, math.clamp(windowSize.Y.Offset, 300, 800))
+    if windowSize.X.Scale > 0 or windowSize.Y.Scale > 0 then mainSize = UDim2.new(math.clamp(windowSize.X.Scale, 0.1, 1), 0, math.clamp(windowSize.Y.Scale, 0.1, 1), 0) end
+    
+    -- PROTEÇÃO: Nome "\0"
+    local mainFrame = Create("Frame", { Name = "\0", Size = mainSize, Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Theme.Background, BorderSizePixel = 0, Parent = screenGui })
     if not mainFrame then return nil end
     AddCorner(mainFrame, 10); AddStroke(mainFrame, Theme.Border)
+    Library._MainFrame = mainFrame
     
-    -- Top Bar
+    -- PROTEÇÃO: Nome "\0" na TopBar
     local topBar = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0, Parent = mainFrame })
     if topBar then
         AddCorner(topBar, 10)
         Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 15), Position = UDim2.new(0, 0, 1, -15), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0, Parent = topBar })
-        Create("Frame", { Size = UDim2.new(1, -20, 0, 1), Position = UDim2.new(0, 10, 1, -1), BackgroundColor3 = Theme.Border, BorderSizePixel = 0, Parent = topBar })
+        Create("Frame", { Name = "\0", Size = UDim2.new(1, -20, 0, 1), Position = UDim2.new(0, 10, 1, -1), BackgroundColor3 = Theme.Border, BorderSizePixel = 0, Parent = topBar })
         MakeDraggable(topBar, mainFrame)
+        
         Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -80, 1, 0), Position = UDim2.new(0, 12, 0, 0), BackgroundTransparency = 1, Text = windowTitle, TextColor3 = Theme.Text, TextSize = 16, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, Parent = topBar })
         
         local minimizeButton = Create("TextButton", { Name = "\0", Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -75, 0.5, -15), BackgroundColor3 = Theme.Element, Text = "−", TextColor3 = Theme.TextDark, TextSize = 18, Font = Enum.Font.GothamBold, Parent = topBar })
         if minimizeButton then
             AddCorner(minimizeButton, 6)
-            minimizeButton.MouseButton1Click:Connect(function()
-                pcall(function()
+            pcall(function()
+                minimizeButton.MouseButton1Click:Connect(function()
                     mainFrame.Visible = not mainFrame.Visible
                     Library.Open = mainFrame.Visible
                     minimizeButton.Text = mainFrame.Visible and "−" or "+"
+                    if Library:Notify and mainFrame.Visible then Library:Notify("Menu", "Interface aberta.", 2, "Info") end
                 end)
             end)
         end
@@ -205,13 +255,20 @@ function Library:CreateWindow(configuration, toggleKey)
         local closeButton = Create("TextButton", { Name = "\0", Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -38, 0.5, -15), BackgroundColor3 = Theme.Error, Text = "×", TextColor3 = Color3.new(1, 1, 1), TextSize = 18, Font = Enum.Font.GothamBold, Parent = topBar })
         if closeButton then
             AddCorner(closeButton, 6)
-            closeButton.MouseButton1Click:Connect(function()
-                pcall(function() screenGui:Destroy() end)
+            pcall(function()
+                closeButton.MouseButton1Click:Connect(function()
+                    Library:Confirm("Encerrar Interface", "Tem certeza que deseja encerrar?\n\nEsta ação irá descarregar todos os elementos.", function(confirmed)
+                        if confirmed and screenGui then
+                            pcall(function() screenGui:Destroy() end)
+                            pcall(function() NotificationGui:Destroy() end)
+                        end
+                    end)
+                end)
             end)
         end
     end
     
-    -- Sidebar
+    -- PROTEÇÃO: Nome "\0" na Sidebar
     local sidebar = Create("Frame", { Name = "\0", Size = UDim2.new(0, 160, 1, -50), Position = UDim2.new(0, 5, 0, 45), BackgroundColor3 = Theme.Sidebar, BorderSizePixel = 0, Parent = mainFrame })
     local tabHolder = nil
     if sidebar then
@@ -229,9 +286,10 @@ function Library:CreateWindow(configuration, toggleKey)
         end
     end
     
+    -- PROTEÇÃO: Nome "\0" no ContentArea
     local contentArea = Create("Frame", { Name = "\0", Size = UDim2.new(1, -175, 1, -50), Position = UDim2.new(0, 170, 0, 45), BackgroundTransparency = 1, ClipsDescendants = true, Parent = mainFrame })
     
-    -- Controles Mobile/Teclado Blindados
+    -- PROTEÇÃO: pcall no InputBegan
     pcall(function()
         UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if gameProcessed then return end
@@ -250,6 +308,7 @@ function Library:CreateWindow(configuration, toggleKey)
         tabName = tabName or "Tab"
         if not tabHolder then return nil end
         
+        -- PROTEÇÃO: Nome "\0"
         local tabButton = Create("TextButton", { Name = "\0", Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = Theme.Sidebar, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Parent = tabHolder })
         if not tabButton then return nil end
         AddCorner(tabButton, 6)
@@ -259,11 +318,12 @@ function Library:CreateWindow(configuration, toggleKey)
         
         local tabLabel = Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -15, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = tabName, TextColor3 = Theme.TextDark, TextSize = 13, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, Parent = tabButton })
         
+        -- PROTEÇÃO: Nome "\0"
         local tabPage = Create("ScrollingFrame", { Name = "\0", Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, ScrollBarThickness = 3, ScrollBarImageColor3 = Theme.Accent, BorderSizePixel = 0, CanvasSize = UDim2.new(0, 0, 0, 0), Visible = false, Parent = contentArea })
         if not tabPage then return nil end
         
         local pageLayout = Create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = tabPage })
-        Create("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5), Parent = tabPage })
+        Create("UIPadding", { Name = "\0", PaddingTop = UDim.new(0, 5), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5), Parent = tabPage })
         
         if pageLayout then
             pcall(function()
@@ -301,6 +361,7 @@ function Library:CreateWindow(configuration, toggleKey)
         local tabObject = {}
         function tabObject:AddSection(sectionName)
             sectionName = sectionName or "Section"
+            -- PROTEÇÃO: Nome "\0"
             local sectionFrame = Create("Frame", { Name = "\0", Size = UDim2.new(1, -5, 0, 35), BackgroundColor3 = Theme.Section, BorderSizePixel = 0, Parent = tabPage })
             if not sectionFrame then return nil end
             AddCorner(sectionFrame, 8); AddStroke(sectionFrame, Theme.Border)
@@ -312,6 +373,7 @@ function Library:CreateWindow(configuration, toggleKey)
                 Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -25, 1, 0), Position = UDim2.new(0, 20, 0, 0), BackgroundTransparency = 1, Text = string.upper(sectionName), TextColor3 = Theme.Text, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, Parent = header })
             end
             
+            -- PROTEÇÃO: Nome "\0"
             local contentContainer = Create("Frame", { Name = "\0", Size = UDim2.new(1, -16, 0, 0), Position = UDim2.new(0, 8, 0, 32), BackgroundTransparency = 1, Parent = sectionFrame })
             local contentLayout = nil
             if contentContainer then
@@ -336,6 +398,7 @@ function Library:CreateWindow(configuration, toggleKey)
             end
             
             function sectionObject:AddButton(text, callback)
+                -- PROTEÇÃO: Nome "\0"
                 local button = Create("TextButton", { Name = "\0", Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Theme.Element, Text = "", AutoButtonColor = false, Parent = contentContainer })
                 if not button then return nil end
                 AddCorner(button, 6)
@@ -355,6 +418,7 @@ function Library:CreateWindow(configuration, toggleKey)
             
             function sectionObject:AddToggle(text, defaultValue, flag, callback)
                 local toggled = defaultValue or false
+                -- PROTEÇÃO: Nome "\0"
                 local toggleButton = Create("TextButton", { Name = "\0", Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Parent = contentContainer })
                 if not toggleButton then return nil end
                 Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -55, 1, 0), BackgroundTransparency = 1, Text = text or "Toggle", TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, Parent = toggleButton })
@@ -380,6 +444,7 @@ function Library:CreateWindow(configuration, toggleKey)
             
             function sectionObject:AddSlider(text, minimum, maximum, defaultValue, flag, callback)
                 local value = math.clamp(defaultValue or minimum, minimum, maximum)
+                -- PROTEÇÃO: Nome "\0"
                 local sliderFrame = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Parent = contentContainer })
                 if not sliderFrame then return nil end
                 Create("TextLabel", { Name = "\0", Size = UDim2.new(0.6, 0, 0, 18), BackgroundTransparency = 1, Text = text or "Slider", TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, Parent = sliderFrame })
@@ -423,6 +488,7 @@ function Library:CreateWindow(configuration, toggleKey)
             
             function sectionObject:AddDropdown(text, options, defaultOption, flag, callback)
                 local selected = defaultOption or (options and options[1]) or ""
+                -- PROTEÇÃO: Nome "\0"
                 local dropdownFrame = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 48), BackgroundTransparency = 1, ClipsDescendants = false, ZIndex = 10, Parent = contentContainer })
                 if not dropdownFrame then return nil end
                 Create("TextLabel", { Name = "\0", Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = text or "Dropdown", TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, Parent = dropdownFrame })
@@ -490,6 +556,7 @@ function Library:CreateWindow(configuration, toggleKey)
             function sectionObject:AddKeybind(text, defaultKey, flag, callback, hold)
                 local key = defaultKey or Enum.KeyCode.None
                 local isListening = false
+                -- PROTEÇÃO: Nome "\0"
                 local keybindFrame = Create("TextButton", { Name = "\0", Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Theme.Element, Text = "", AutoButtonColor = false, Parent = contentContainer })
                 if not keybindFrame then return nil end
                 AddCorner(keybindFrame, 6)
@@ -533,13 +600,34 @@ function Library:CreateWindow(configuration, toggleKey)
                 return { Set = function(newKey) key = newKey; if keyLabel then keyLabel.Text = key.Name end end, Get = function() return key end }
             end
             
-            -- COLOR PICKER BLINDADO (Removido rbxassetid customizado)
+            function sectionObject:AddTextbox(placeholder, flag, callback)
+                placeholder = placeholder or "Digite algo..."
+                -- PROTEÇÃO: Nome "\0"
+                local textBoxFrame = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Theme.Element, BorderSizePixel = 0, Parent = contentContainer })
+                if not textBoxFrame then return nil end
+                AddCorner(textBoxFrame, 6)
+                local textBox = Create("TextBox", { Name = "\0", Size = UDim2.new(1, -16, 1, 0), Position = UDim2.new(0, 8, 0, 0), BackgroundTransparency = 1, PlaceholderText = placeholder, PlaceholderColor3 = Theme.TextDark, Text = "", TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, Parent = textBoxFrame })
+                
+                pcall(function()
+                    if textBox then
+                        textBox.FocusLost:Connect(function()
+                            if Library.Flags[flag] ~= nil then Library.Flags[flag] = textBox.Text end
+                            if callback then pcall(callback, textBox.Text) end
+                        end)
+                    end
+                end)
+                return { Set = function(txt) pcall(function() if textBox then textBox.Text = txt end end) end, Get = function() return textBox and textBox.Text or "" end }
+            end
+            
+            -- Color Picker BLINDADO (Mantido idêntico ao original, com asset IDs)
             function sectionObject:AddColorPicker(text, defaultColor, flag, callback)
-                local hue, saturation, value = defaultColor:ToHSV()
-                local color = defaultColor
+                local hue, saturation, value = (defaultColor or Color3.fromRGB(255,255,255)):ToHSV()
+                local color = defaultColor or Color3.fromRGB(255,255,255)
+                local isOpen = false
+                
+                -- PROTEÇÃO: Nome "\0"
                 local colorFrame = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, ClipsDescendants = false, Parent = contentContainer })
                 if not colorFrame then return nil end
-                
                 Create("TextLabel", { Name = "\0", Size = UDim2.new(1, -45, 1, 0), BackgroundTransparency = 1, Text = text or "Color", TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, Parent = colorFrame })
                 local colorButton = Create("TextButton", { Name = "\0", Size = UDim2.new(0, 35, 0, 22), Position = UDim2.new(1, -37, 0.5, -11), BackgroundColor3 = color, Text = "", Parent = colorFrame })
                 if colorButton then AddCorner(colorButton, 4); AddStroke(colorButton, Theme.Border) end
@@ -547,40 +635,63 @@ function Library:CreateWindow(configuration, toggleKey)
                 local pickerFrame = Create("Frame", { Name = "\0", Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 4), BackgroundColor3 = Theme.Section, ClipsDescendants = true, Visible = false, ZIndex = 30, BorderSizePixel = 0, Parent = colorFrame })
                 if pickerFrame then AddCorner(pickerFrame, 8); AddStroke(pickerFrame, Theme.Border) end
                 
-                -- Substituído ImageButton por Sliders para evitar asset_detector
-                local svSlider = Create("TextButton", { Name = "\0", Size = UDim2.new(1, -20, 0, 10), Position = UDim2.new(0, 10, 0, 10), BackgroundColor3 = Color3.fromHSV(hue, 1, 1), Text = "", Parent = pickerFrame })
-                if svSlider then AddCorner(svSlider, 5) end
+                local saturationValueMap = Create("ImageButton", { Name = "\0", Size = UDim2.new(0, 120, 0, 90), Position = UDim2.new(0, 10, 0, 10), BackgroundColor3 = Color3.fromHSV(hue, 1, 1), Image = "rbxassetid://4155801252", AutoButtonColor = false, ZIndex = 31, Parent = pickerFrame })
+                if saturationValueMap then AddCorner(saturationValueMap, 4) end
+                local saturationValueCursor = Create("Frame", { Name = "\0", Size = UDim2.new(0, 8, 0, 8), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(saturation, 0, 1 - value, 0), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 32, BorderSizePixel = 0, Parent = saturationValueMap })
+                if saturationValueCursor then AddCorner(saturationValueCursor, 4); AddStroke(saturationValueCursor, Color3.new(0, 0, 0), 1) end
                 
-                local hueSlider = Create("TextButton", { Name = "\0", Size = UDim2.new(1, -20, 0, 10), Position = UDim2.new(0, 10, 0, 30), BackgroundColor3 = Color3.new(1,1,1), Text = "", Parent = pickerFrame })
-                if hueSlider then
-                    AddCorner(hueSlider, 5)
-                    Create("UIGradient", { Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255,255,0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0,0,255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255,0,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0)) }), Parent = hueSlider })
+                local hueBar = Create("ImageButton", { Name = "\0", Size = UDim2.new(0, 18, 0, 90), Position = UDim2.new(0, 140, 0, 10), BackgroundColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, ZIndex = 31, Parent = pickerFrame })
+                if hueBar then
+                    AddCorner(hueBar, 4)
+                    Create("UIGradient", { Name = "\0", Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) }), Parent = hueBar })
+                end
+                local hueCursor = Create("Frame", { Name = "\0", Size = UDim2.new(1, 4, 0, 4), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, hue, 0), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 32, BorderSizePixel = 0, Parent = hueBar })
+                if hueCursor then AddCorner(hueCursor, 2); AddStroke(hueCursor, Color3.new(0, 0, 0), 1) end
+                
+                local function UpdateColor()
+                    pcall(function()
+                        color = Color3.fromHSV(hue, saturation, value)
+                        if colorButton then colorButton.BackgroundColor3 = color end
+                        if saturationValueMap then saturationValueMap.BackgroundColor3 = Color3.fromHSV(hue, 1, 1) end
+                        if Library.Flags[flag] ~= nil then Library.Flags[flag] = color end
+                        if callback then pcall(callback, color) end
+                    end)
                 end
                 
+                local isDraggingSaturation = false
+                local isDraggingHue = false
                 pcall(function()
-                    colorButton.MouseButton1Click:Connect(function()
-                        pickerFrame.Visible = not pickerFrame.Visible
-                        Tween(pickerFrame, 0.2, {Size = pickerFrame.Visible and UDim2.new(1, 0, 0, 50) or UDim2.new(1, 0, 0, 0)})
-                        colorFrame.Size = UDim2.new(1, 0, 0, pickerFrame.Visible and 84 or 30)
+                    if saturationValueMap then saturationValueMap.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingSaturation = true end end) end
+                    if hueBar then hueBar.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingHue = true end end) end
+                    
+                    UserInputService.InputChanged:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                            if isDraggingSaturation and saturationValueMap then
+                                saturation = math.clamp((input.Position.X - saturationValueMap.AbsolutePosition.X) / saturationValueMap.AbsoluteSize.X, 0, 1)
+                                value = 1 - math.clamp((input.Position.Y - saturationValueMap.AbsolutePosition.Y) / saturationValueMap.AbsoluteSize.Y, 0, 1)
+                                if saturationValueCursor then saturationValueCursor.Position = UDim2.new(saturation, 0, 1 - value, 0) end
+                                UpdateColor()
+                            elseif isDraggingHue and hueBar then
+                                hue = math.clamp((input.Position.Y - hueBar.AbsolutePosition.Y) / hueBar.AbsoluteSize.Y, 0, 1)
+                                if hueCursor then hueCursor.Position = UDim2.new(0.5, 0, hue, 0) end
+                                UpdateColor()
+                            end
+                        end
+                    end)
+                    UserInputService.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingSaturation = false; isDraggingHue = false end
                     end)
                     
-                    svSlider.MouseButton1Click:Connect(function()
-                        saturation = math.random(); value = math.random()
-                        color = Color3.fromHSV(hue, saturation, value)
-                        colorButton.BackgroundColor3 = color
-                        if Library.Flags[flag] ~= nil then Library.Flags[flag] = color end
-                        if callback then pcall(callback, color) end
-                    end)
-                    
-                    hueSlider.MouseButton1Click:Connect(function()
-                        hue = math.random()
-                        color = Color3.fromHSV(hue, saturation, value)
-                        colorButton.BackgroundColor3 = color
-                        if Library.Flags[flag] ~= nil then Library.Flags[flag] = color end
-                        if callback then pcall(callback, color) end
-                    end)
+                    if colorButton then
+                        colorButton.MouseButton1Click:Connect(function()
+                            isOpen = not isOpen
+                            pickerFrame.Visible = isOpen
+                            Tween(pickerFrame, 0.2, {Size = isOpen and UDim2.new(1, 0, 0, 110) or UDim2.new(1, 0, 0, 0)})
+                            colorFrame.Size = UDim2.new(1, 0, 0, isOpen and 144 or 30)
+                        end)
+                    end
                 end)
-                return { Set = function(newColor) hue, saturation, value = newColor:ToHSV(); color = newColor; if colorButton then colorButton.BackgroundColor3 = color end end, Get = function() return color end }
+                return { Set = function(newColor) hue, saturation, value = newColor:ToHSV(); if saturationValueCursor then saturationValueCursor.Position = UDim2.new(saturation, 0, 1 - value, 0) end; if hueCursor then hueCursor.Position = UDim2.new(0.5, 0, hue, 0) end; UpdateColor() end, Get = function() return color end }
             end
             
             return sectionObject
