@@ -1633,7 +1633,7 @@ function Library:CreateConfigTab(window)
                 Library.Flags["Config_Theme"] or "SKECH", "Config_Theme",
                 function(name)
                     Library:ApplyTheme(name)
-                    Library:Notify("🎨 Tema", "Aplicado: " .. tostring(name), 2, "Success")
+                    Library:Notify("Tema", "Aplicado: " .. tostring(name), 2, "Success")
                 end)
 
             appS:AddSlider("Transparência", 0, 80, 0, "Config_Transparency", function(v)
@@ -1651,7 +1651,7 @@ function Library:CreateConfigTab(window)
     -- ════════════════════════════════════════════════════════════
     -- COMPORTAMENTO
     -- ════════════════════════════════════════════════════════════
-    local behS = cfgTab:AddSection("🎮 Comportamento")
+    local behS = cfgTab:AddSection(" Comportamento")
     if behS then
         pcall(function()
             behS:AddKeybind("Tecla de Abrir/Fechar", Library.Keybind, "Config_ToggleKey",
@@ -1673,7 +1673,7 @@ function Library:CreateConfigTab(window)
     -- ════════════════════════════════════════════════════════════
     -- CONFIGS SALVOS
     -- ════════════════════════════════════════════════════════════
-    local savS = cfgTab:AddSection("💾 Configs Salvos")
+    local savS = cfgTab:AddSection(" Configs Salvos")
     local currentName = "default"
     local cfgList = nil
 
@@ -1689,22 +1689,22 @@ function Library:CreateConfigTab(window)
                 Library:ListConfigs(), Library:GetAutoLoad() or "default",
                 "Config_List", function(n) currentName = n end)
 
-            savS:AddButton("🔄 Atualizar Lista", function()
+            savS:AddButton(" Atualizar Lista", function()
                 if cfgList then cfgList:Refresh(Library:ListConfigs()) end
                 Library:Notify("Lista", #Library:ListConfigs() .. " config(s).", 2, "Info")
             end)
 
-            savS:AddButton("💾 Salvar Config", function()
+            savS:AddButton(" Salvar Config", function()
                 Library:SaveConfig(currentName)
                 Library.Flags["Config_LastUsed"] = currentName
                 if cfgList then cfgList:Refresh(Library:ListConfigs()) end
             end)
 
-            savS:AddButton("📂 Carregar Config", function()
+            savS:AddButton(" Carregar Config", function()
                 Library:LoadConfig(currentName)
             end)
 
-            savS:AddButton("🗑️ Deletar Config", function()
+            savS:AddButton(" Deletar Config", function()
                 Library:Confirm("Deletar", "Remover '" .. currentName .. "'?", function(ok2)
                     if ok2 then
                         Library:DeleteConfig(currentName)
@@ -1718,26 +1718,26 @@ function Library:CreateConfigTab(window)
     -- ════════════════════════════════════════════════════════════
     -- AUTOLOAD
     -- ════════════════════════════════════════════════════════════
-    local autoS = cfgTab:AddSection("⚡ AutoLoad")
+    local autoS = cfgTab:AddSection(" AutoLoad")
     if autoS then
         pcall(function()
             autoS:AddButton("Marcar como AutoLoad", function() Library:SetAutoLoad(currentName) end)
-            autoS:AddButton("❌ Remover AutoLoad", function() Library:ClearAutoLoad() end)
+            autoS:AddButton(" Remover AutoLoad", function() Library:ClearAutoLoad() end)
         end)
     end
 
     -- ════════════════════════════════════════════════════════════
     -- COMPARTILHAR
     -- ════════════════════════════════════════════════════════════
-    local shS = cfgTab:AddSection("📤 Compartilhar")
+    local shS = cfgTab:AddSection(" Compartilhar")
     if shS then
         pcall(function()
-            shS:AddButton("📋 Copiar Config", function()
+            shS:AddButton(" Copiar Config", function()
                 local str = Library:ExportConfigString()
                 if not str then Library:Notify("Erro", "Falha ao exportar.", 2, "Error"); return end
                 if setclipboard then
                     pcall(setclipboard, str)
-                    Library:Notify("📋 Copiado", "Config copiada!", 3, "Success")
+                    Library:Notify(" Copiado", "Config copiada!", 3, "Success")
                 else
                     Library:Notify("Aviso", "setclipboard indisponível.", 3, "Warning")
                 end
@@ -1755,10 +1755,10 @@ function Library:CreateConfigTab(window)
     -- ════════════════════════════════════════════════════════════
     -- ZONA DE PERIGO
     -- ════════════════════════════════════════════════════════════
-    local dgS = cfgTab:AddSection("⚠️ Zona de Perigo")
+    local dgS = cfgTab:AddSection(" Zona de Perigo")
     if dgS then
         pcall(function()
-            dgS:AddButton("🔥 Resetar Todas as Flags", function()
+            dgS:AddButton(" Resetar Todas as Flags", function()
                 Library:Confirm("Resetar", "Apagar TODAS as flags?", function(ok2)
                     if ok2 then
                         Library.Flags = {}
@@ -1766,7 +1766,7 @@ function Library:CreateConfigTab(window)
                     end
                 end)
             end)
-            dgS:AddButton("❌ Desinstalar Interface", function()
+            dgS:AddButton(" Desinstalar Interface", function()
                 Library:Confirm("Desinstalar", "Isso remove a UI inteira.\n\nContinuar?", function(ok2)
                     if ok2 then
                         pcall(function()
@@ -1797,7 +1797,7 @@ function Library:CreateConfigTab(window)
         task.wait(0.5)
         local last = Library:GetAutoLoad()
         if last and last ~= "" then
-            Library:Notify("⚡ AutoLoad", "Carregando '" .. last .. "'...", 2, "Info")
+            Library:Notify(" AutoLoad", "Carregando '" .. last .. "'...", 2, "Info")
             Library:LoadConfig(last)
         else
             local t = Library.Flags["Config_Theme"]
