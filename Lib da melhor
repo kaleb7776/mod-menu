@@ -1189,6 +1189,40 @@ function Library:CreateWindow(configuration, toggleKey)
                 return o
             end
             function sectionObject:AddKeybind(text, defaultKey, flag, callback, hold)
+                -- [PT-BR] Tabela de nomes traduzidos
+                local KeyNamesPT = {
+                    [Enum.KeyCode.LeftControl]  = "Esq Ctrl",
+                    [Enum.KeyCode.RightControl] = "Dir Ctrl",
+                    [Enum.KeyCode.LeftShift]    = "Esq Shift",
+                    [Enum.KeyCode.RightShift]   = "Dir Shift",
+                    [Enum.KeyCode.LeftAlt]      = "Esq Alt",
+                    [Enum.KeyCode.RightAlt]     = "Dir Alt",
+                    [Enum.KeyCode.Space]        = "Espaço",
+                    [Enum.KeyCode.Return]       = "Enter",
+                    [Enum.KeyCode.Backspace]    = "Backspace",
+                    [Enum.KeyCode.Escape]       = "ESC",
+                    [Enum.KeyCode.Insert]       = "Insert",
+                    [Enum.KeyCode.Delete]       = "Delete",
+                    [Enum.KeyCode.Home]         = "Home",
+                    [Enum.KeyCode.End]          = "End",
+                    [Enum.KeyCode.PageUp]       = "Pg Up",
+                    [Enum.KeyCode.PageDown]     = "Pg Dn",
+                    [Enum.KeyCode.Up]           = "↑",
+                    [Enum.KeyCode.Down]         = "↓",
+                    [Enum.KeyCode.Left]         = "←",
+                    [Enum.KeyCode.Right]        = "→",
+                    [Enum.KeyCode.None]         = "...",
+                    [Enum.UserInputType.MouseButton1] = "Clique Esq",
+                    [Enum.UserInputType.MouseButton2] = "Clique Dir",
+                    [Enum.UserInputType.MouseButton3] = "Clique Meio",
+                }
+                local function TranslateKey(k)
+                    if not k then return "..." end
+                    if KeyNamesPT[k] then return KeyNamesPT[k] end
+                    local n = tostring(k)
+                    return n:gsub("Enum%.KeyCode%.", ""):gsub("Enum%.UserInputType%.", "")
+                end
+
                 defaultKey = defaultKey or Enum.KeyCode.None
                 callback = callback or function() end
                 hold = hold == true
@@ -1208,7 +1242,7 @@ function Library:CreateWindow(configuration, toggleKey)
                 local kl = SafeNew("TextLabel", {
                     Name = "Key", Size = UDim2.new(0, 55, 0, 20), Position = UDim2.new(1, -60, 0.5, -10),
                     BackgroundColor3 = Theme.SliderBg,
-                    Text = (tostring(key) == "Enum.KeyCode.None") and "..." or tostring(key):gsub("Enum.KeyCode.", ""),
+                    Text = TranslateKey(key),
                     TextColor3 = Theme.Accent, TextSize = 11, Font = Enum.Font.GothamBold, Parent = kb,
                 })
                 AddCorner(kl, 4); SetColor(kl, "BackgroundColor3", "SliderBg")
@@ -1230,7 +1264,7 @@ function Library:CreateWindow(configuration, toggleKey)
                         if isKb or isMb then
                             key = isKb and input.KeyCode or input.UserInputType
                             pcall(function()
-                                kl.Text = tostring(key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+                                kl.Text = TranslateKey(key)
                                 Tween(kl, 0.15, { BackgroundColor3 = Theme.SliderBg })
                                 kl.TextColor3 = Theme.Accent
                             end)
@@ -1269,7 +1303,7 @@ function Library:CreateWindow(configuration, toggleKey)
                 function o:Set(k)
                     key = k
                     pcall(function()
-                        kl.Text = (tostring(key) == "Enum.KeyCode.None") and "..." or tostring(key):gsub("Enum.KeyCode.", "")
+                        kl.Text = TranslateKey(key)
                     end)
                     if flag then Library.Flags[flag] = key end
                 end
@@ -1277,7 +1311,7 @@ function Library:CreateWindow(configuration, toggleKey)
                 RegisterControl(flag, function(v)
                     key = v
                     pcall(function()
-                        kl.Text = (tostring(key) == "Enum.KeyCode.None") and "..." or tostring(key):gsub("Enum.KeyCode.", "")
+                        kl.Text = TranslateKey(key)
                     end)
                 end)
                 return o
