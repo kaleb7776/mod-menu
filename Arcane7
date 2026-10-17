@@ -1,6 +1,5 @@
 -- ================================================================
--- RAVION UI v1.4.0 – SKECH + TEMAS + CONFIG
--- Base: 1900 linhas originais + temas + config system
+-- RAVION UI v1.5.0 – SKECH + TEMAS + CONFIG + AUTO CONFIG TAB
 -- ================================================================
 
 local Players = game:GetService("Players")
@@ -8,12 +7,12 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService") -- [NEW]
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local IsMobile = UserInputService.TouchEnabled
 
 -- ================================================================
--- PROTEÇÕES GLOBAIS (iguais)
+-- PROTEÇÕES GLOBAIS
 -- ================================================================
 local function SafeCall(fn, ...)
     if type(fn) ~= "function" then return nil end
@@ -154,7 +153,7 @@ local Theme = {
 }
 
 -- ================================================================
--- [NEW] 11 TEMAS
+-- 11 TEMAS
 -- ================================================================
 local function MakeTheme(bg, sidebar, section, element, hover, accent, accentHover, text, textDark, border)
     return {
@@ -249,11 +248,12 @@ local Library = {
     Flags = {}, Open = true, Keybind = Enum.KeyCode.RightControl,
     AutoSave = true,
     _ScreenGui = nil, _MainFrame = nil, _MobileButton = nil, _Footer = nil, _NotificationGui = nil,
+    _LastWindow = nil, _ConfigTab = nil, _ConfigTabCreated = false,
 }
 CloneRef:Keep("Library", Library)
 
 -- ================================================================
--- [NEW] REGISTRY DE CORES / CONTROLES / CONFIG SYSTEM
+-- REGISTRY DE CORES / CONTROLES / CONFIG SYSTEM
 -- ================================================================
 local ColorRegistry = {}
 local ThemeRefreshers = {}
@@ -454,7 +454,7 @@ function Library:GetIcon(name, pack)
 end
 
 -- ================================================================
--- [NEW] CONFIG SYSTEM
+-- CONFIG SYSTEM (Save / Load / List / Delete / Export / Import / AutoLoad)
 -- ================================================================
 function Library:SaveConfig(name)
     if not HAS_FILE then Library:Notify("Erro", "Executor sem arquivos.", 3, "Error"); return false end
@@ -621,6 +621,7 @@ function Library:CreateWindow(configuration, toggleKey)
     local windowMaxSize    = configuration.MaxSize or Vector2.new(1000, 800)
     local hideFooter       = configuration.HideFooter ~= false
     local effectiveFooterHeight = hideFooter and 0 or (tonumber(configuration.FooterHeight) or 50)
+    local autoConfigTab    = configuration.AutoConfigTab ~= false -- [NOVO] cria aba Config automática
 
     Library.Keybind = windowKeybind
 
@@ -772,6 +773,7 @@ function Library:CreateWindow(configuration, toggleKey)
                         Library.Flags = {}
                         Library._ScreenGui = nil; Library._MainFrame = nil
                         Library._MobileButton = nil; Library._Footer = nil; Library._NotificationGui = nil
+                        Library._LastWindow = nil; Library._ConfigTab = nil; Library._ConfigTabCreated = false
                         pcall(function()
                             game:GetService("StarterGui"):SetCore("SendNotification", {
                                 Title = "Interface Encerrada", Text = "A interface foi descarregada.", Duration = 4,
@@ -1166,7 +1168,6 @@ function Library:CreateWindow(configuration, toggleKey)
             end
 
             function sectionObject:AddTextbox(placeholder, defaultText, flag, callback)
-                -- Signature compatível: (placeholder, flag, callback) OU (placeholder, defaultText, flag, callback)
                 if type(defaultText) == "string" or defaultText == nil then
                     if type(flag) == "function" then callback = flag; flag = defaultText; defaultText = "" end
                 else
@@ -1549,90 +1550,275 @@ function Library:CreateWindow(configuration, toggleKey)
     end
 
     -- ============================================================
-    -- [NEW] ABA CONFIG (chamar Library:CreateConfigTab(window))
+    -- Salva window pra CreateConfigTab usar
     -- ============================================================
-    function Library:CreateConfigTab(window)
-        window = window or windowObject
-        local cfgTab = window:AddTab("Config", "⚙️")
-        local appS = cfgTab:AddSection("Aparência")
-        appS:AddDropdown("🎨 Tema", Themes._Order,
-            Library.Flags["Config_Theme"] or "SKECH", "Config_Theme",
-            function(name) Library:ApplyTheme(name) end)
-        appS:AddSlider("Transparência", 0, 80, 0, "Config_Transparency", function(v)
-            if Library._MainFrame then Library._MainFrame.BackgroundTransparency = v / 100 end
-        end)
+    Library._LastWindow = windowObject
 
-        local behS = cfgTab:AddSection("Comportamento")
-        behS:AddKeybind("Tecla de Abrir/Fechar", Library.Keybind, "Config_ToggleKey", function(k) Library.Keybind = k end)
-        behS:AddToggle("Auto-Salvar ao Fechar", true, "Config_AutoSave", function(s) Library.AutoSave = s end)
-
-        local savS = cfgTab:AddSection("💾 Configs Salvos")
-        local currentName = "default"
-        savS:AddTextbox("Nome do Config", "default", "Config_Name", function(txt)
-            if txt and txt ~= "" then currentName = txt:gsub("[^%w_%-]", "_") end
-        end)
-        local cfgList = savS:AddDropdown("Configs Encontrados", Library:ListConfigs(),
-            Library:GetAutoLoad() or "default", "Config_List", function(n) currentName = n end)
-        savS:AddButton("🔄 Atualizar Lista", function()
-            cfgList:Refresh(Library:ListConfigs())
-            Library:Notify("Lista", #Library:ListConfigs() .. " config(s).", 2, "Info")
-        end)
-        savS:AddButton("💾 Salvar Config", function()
-            Library:SaveConfig(currentName)
-            Library.Flags["Config_LastUsed"] = currentName
-            cfgList:Refresh(Library:ListConfigs())
-        end)
-        savS:AddButton("📂 Carregar Config", function()
-            Library:LoadConfig(currentName)
-        end)
-        savS:AddButton("🗑️ Deletar Config", function()
-            Library:Confirm("Deletar", "Remover '" .. currentName .. "'?", function(ok)
-                if ok then Library:DeleteConfig(currentName); cfgList:Refresh(Library:ListConfigs()) end
-            end)
-        end)
-
-        local autoS = cfgTab:AddSection("⚡ AutoLoad")
-        autoS:AddButton("Marcar como AutoLoad", function() Library:SetAutoLoad(currentName) end)
-        autoS:AddButton("❌ Remover AutoLoad", function() Library:ClearAutoLoad() end)
-
-        local shS = cfgTab:AddSection("📤 Compartilhar")
-        shS:AddButton("📋 Copiar Config (clipboard)", function()
-            local str = Library:ExportConfigString()
-            if not str then Library:Notify("Erro", "Falha ao exportar.", 2, "Error"); return end
-            if setclipboard then
-                pcall(setclipboard, str)
-                Library:Notify("📋 Copiado", "Config copiada!", 3, "Success")
-            else Library:Notify("Aviso", "setclipboard indisponível.", 3, "Warning") end
-        end)
-        shS:AddTextbox("Colar config aqui...", "", "Config_Import", function(str)
-            if str and str ~= "" then
-                if Library:ImportConfigString(str) then cfgList:Refresh(Library:ListConfigs()) end
-            end
-        end)
-
-        local dgS = cfgTab:AddSection("⚠️ Zona de Perigo")
-        dgS:AddButton("🔥 Resetar Todas as Flags", function()
-            Library:Confirm("Resetar", "Apagar TODAS as flags?", function(ok)
-                if ok then Library.Flags = {}; Library:Notify("Resetado", "Tudo apagado.", 3, "Warning") end
-            end)
-        end)
-
+    -- ============================================================
+    -- [NOVO] AUTO-CRIA ABA CONFIG (sem precisar chamar)
+    -- ============================================================
+    if autoConfigTab and not Library._ConfigTabCreated then
         task.defer(function()
-            task.wait(0.5)
-            local last = Library:GetAutoLoad()
-            if last and last ~= "" then
-                Library:Notify("⚡ AutoLoad", "Carregando '" .. last .. "'...", 2, "Info")
-                Library:LoadConfig(last)
-            else
-                local t = Library.Flags["Config_Theme"]
-                if t and Themes[t] then Library:ApplyTheme(t) end
+            task.wait(0.1)
+            if Library.CreateConfigTab then
+                pcall(function()
+                    Library:CreateConfigTab(windowObject)
+                end)
             end
         end)
-
-        return cfgTab
     end
 
     return windowObject
 end
+
+-- ================================================================
+-- ABA CONFIG (FORA de CreateWindow — sempre definida)
+-- ================================================================
+function Library:CreateConfigTab(window)
+    -- Guard anti-duplicação
+    if Library._ConfigTabCreated then
+        warn("[Ravion] Aba Config já existe, ignorando.")
+        return Library._ConfigTab
+    end
+
+    window = window or Library._LastWindow
+    if not window then
+        warn("[Ravion] CreateConfigTab: nenhuma window. Chame Library:CreateWindow() antes.")
+        return nil
+    end
+    if type(window.AddTab) ~= "function" then
+        warn("[Ravion] CreateConfigTab: window inválida.")
+        return nil
+    end
+
+    local cfgTab = window:AddTab("⚙️ Config", "⚙️")
+    if not cfgTab then
+        warn("[Ravion] CreateConfigTab: AddTab retornou nil.")
+        return nil
+    end
+
+    Library._ConfigTab = cfgTab
+    Library._ConfigTabCreated = true
+
+    -- Move a aba Config pro FINAL do sidebar
+    pcall(function()
+        local screenGui = Library._ScreenGui
+        if not screenGui then return end
+        local main = screenGui:FindFirstChild("Main")
+        if not main then return end
+        local sidebar = main:FindFirstChild("Sidebar")
+        if not sidebar then return end
+        local tabHolder = sidebar:FindFirstChild("TabHolder")
+        if not tabHolder then return end
+
+        local cfgBtn = tabHolder:FindFirstChild("⚙️ Config")
+        if not cfgBtn then return end
+
+        local lastOrder = 0
+        for _, child in ipairs(tabHolder:GetChildren()) do
+            if child:IsA("TextButton") and child ~= cfgBtn then
+                if child.LayoutOrder > lastOrder then lastOrder = child.LayoutOrder end
+            end
+        end
+        cfgBtn.LayoutOrder = lastOrder + 1
+    end)
+
+    -- ════════════════════════════════════════════════════════════
+    -- APARÊNCIA
+    -- ════════════════════════════════════════════════════════════
+    local appS = cfgTab:AddSection("🎨 Aparência")
+    if appS then
+        pcall(function()
+            appS:AddDropdown("Tema", Themes._Order,
+                Library.Flags["Config_Theme"] or "SKECH", "Config_Theme",
+                function(name)
+                    Library:ApplyTheme(name)
+                    Library:Notify("🎨 Tema", "Aplicado: " .. tostring(name), 2, "Success")
+                end)
+
+            appS:AddSlider("Transparência", 0, 80, 0, "Config_Transparency", function(v)
+                if Library._MainFrame then
+                    Library._MainFrame.BackgroundTransparency = SafeDivide(v, 100, 0)
+                end
+            end)
+
+            appS:AddToggle("Animações Suaves", true, "Config_Animations", function(state)
+                _G.RavionTweenSpeed = state and 0.2 or 0
+            end)
+        end)
+    end
+
+    -- ════════════════════════════════════════════════════════════
+    -- COMPORTAMENTO
+    -- ════════════════════════════════════════════════════════════
+    local behS = cfgTab:AddSection("🎮 Comportamento")
+    if behS then
+        pcall(function()
+            behS:AddKeybind("Tecla de Abrir/Fechar", Library.Keybind, "Config_ToggleKey",
+                function(k) Library.Keybind = k end)
+
+            behS:AddToggle("Auto-Salvar ao Fechar", true, "Config_AutoSave",
+                function(s) Library.AutoSave = s end)
+
+            behS:AddToggle("Começar Minimizado", false, "Config_StartMin", function(state)
+                Library.StartMinimized = state
+                if state and Library._MainFrame then
+                    Library._MainFrame.Visible = false
+                    Library.Open = false
+                end
+            end)
+        end)
+    end
+
+    -- ════════════════════════════════════════════════════════════
+    -- CONFIGS SALVOS
+    -- ════════════════════════════════════════════════════════════
+    local savS = cfgTab:AddSection("💾 Configs Salvos")
+    local currentName = "default"
+    local cfgList = nil
+
+    if savS then
+        pcall(function()
+            savS:AddTextbox("Nome do Config", "Config_Name", function(txt)
+                if txt and txt ~= "" then
+                    currentName = tostring(txt):gsub("[^%w_%-]", "_")
+                end
+            end)
+
+            cfgList = savS:AddDropdown("Configs Encontrados",
+                Library:ListConfigs(), Library:GetAutoLoad() or "default",
+                "Config_List", function(n) currentName = n end)
+
+            savS:AddButton("🔄 Atualizar Lista", function()
+                if cfgList then cfgList:Refresh(Library:ListConfigs()) end
+                Library:Notify("Lista", #Library:ListConfigs() .. " config(s).", 2, "Info")
+            end)
+
+            savS:AddButton("💾 Salvar Config", function()
+                Library:SaveConfig(currentName)
+                Library.Flags["Config_LastUsed"] = currentName
+                if cfgList then cfgList:Refresh(Library:ListConfigs()) end
+            end)
+
+            savS:AddButton("📂 Carregar Config", function()
+                Library:LoadConfig(currentName)
+            end)
+
+            savS:AddButton("🗑️ Deletar Config", function()
+                Library:Confirm("Deletar", "Remover '" .. currentName .. "'?", function(ok2)
+                    if ok2 then
+                        Library:DeleteConfig(currentName)
+                        if cfgList then cfgList:Refresh(Library:ListConfigs()) end
+                    end
+                end)
+            end)
+        end)
+    end
+
+    -- ════════════════════════════════════════════════════════════
+    -- AUTOLOAD
+    -- ════════════════════════════════════════════════════════════
+    local autoS = cfgTab:AddSection("⚡ AutoLoad")
+    if autoS then
+        pcall(function()
+            autoS:AddButton("Marcar como AutoLoad", function() Library:SetAutoLoad(currentName) end)
+            autoS:AddButton("❌ Remover AutoLoad", function() Library:ClearAutoLoad() end)
+        end)
+    end
+
+    -- ════════════════════════════════════════════════════════════
+    -- COMPARTILHAR
+    -- ════════════════════════════════════════════════════════════
+    local shS = cfgTab:AddSection("📤 Compartilhar")
+    if shS then
+        pcall(function()
+            shS:AddButton("📋 Copiar Config", function()
+                local str = Library:ExportConfigString()
+                if not str then Library:Notify("Erro", "Falha ao exportar.", 2, "Error"); return end
+                if setclipboard then
+                    pcall(setclipboard, str)
+                    Library:Notify("📋 Copiado", "Config copiada!", 3, "Success")
+                else
+                    Library:Notify("Aviso", "setclipboard indisponível.", 3, "Warning")
+                end
+            end)
+            shS:AddTextbox("Colar config aqui...", "Config_Import", function(str)
+                if str and str ~= "" then
+                    if Library:ImportConfigString(str) and cfgList then
+                        cfgList:Refresh(Library:ListConfigs())
+                    end
+                end
+            end)
+        end)
+    end
+
+    -- ════════════════════════════════════════════════════════════
+    -- ZONA DE PERIGO
+    -- ════════════════════════════════════════════════════════════
+    local dgS = cfgTab:AddSection("⚠️ Zona de Perigo")
+    if dgS then
+        pcall(function()
+            dgS:AddButton("🔥 Resetar Todas as Flags", function()
+                Library:Confirm("Resetar", "Apagar TODAS as flags?", function(ok2)
+                    if ok2 then
+                        Library.Flags = {}
+                        Library:Notify("Resetado", "Tudo apagado.", 3, "Warning")
+                    end
+                end)
+            end)
+            dgS:AddButton("❌ Desinstalar Interface", function()
+                Library:Confirm("Desinstalar", "Isso remove a UI inteira.\n\nContinuar?", function(ok2)
+                    if ok2 then
+                        pcall(function()
+                            if Library._ScreenGui then Library._ScreenGui:Destroy() end
+                            if Library._NotificationGui then Library._NotificationGui:Destroy() end
+                        end)
+                        Library.Flags = {}
+                        Library._ScreenGui = nil
+                        Library._MainFrame = nil
+                        Library._MobileButton = nil
+                        Library._Footer = nil
+                        Library._NotificationGui = nil
+                        Library._LastWindow = nil
+                        Library._ConfigTab = nil
+                        Library._ConfigTabCreated = false
+                        _G.RavionUILoaded = nil
+                        warn("[Ravion] Interface desinstalada.")
+                    end
+                end)
+            end)
+        end)
+    end
+
+    -- ════════════════════════════════════════════════════════════
+    -- AUTO-LOAD ao iniciar
+    -- ════════════════════════════════════════════════════════════
+    task.defer(function()
+        task.wait(0.5)
+        local last = Library:GetAutoLoad()
+        if last and last ~= "" then
+            Library:Notify("⚡ AutoLoad", "Carregando '" .. last .. "'...", 2, "Info")
+            Library:LoadConfig(last)
+        else
+            local t = Library.Flags["Config_Theme"]
+            if t and Themes[t] then Library:ApplyTheme(t) end
+        end
+        if Library.Flags["Config_StartMin"] and Library._MainFrame then
+            Library._MainFrame.Visible = false
+            Library.Open = false
+        end
+    end)
+
+    print("[Ravion] Aba Config criada automaticamente.")
+    return cfgTab
+end
+
+-- ================================================================
+-- REGISTRA NO _G COM FINGERPRINT
+-- ================================================================
+_G.RavionUILoaded = {
+    Version = "1.5.0",
+    Library = Library,
+}
 
 return Library
