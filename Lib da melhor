@@ -1237,6 +1237,7 @@ function Library:CreateWindow(configuration, toggleKey)
                             if flag then Library.Flags[flag] = key end
                             isListening = false
                             if conn then pcall(function() conn:Disconnect() end) end
+                            SafeCall(callback, key)
                         end
                     end)
                 end)
@@ -1250,9 +1251,9 @@ function Library:CreateWindow(configuration, toggleKey)
                             isHolding = true
                             if holdConn then pcall(function() holdConn:Disconnect() end) end
                             holdConn = SafeConnect(RunService.Heartbeat, function()
-                                if isHolding then SafeCall(callback) end
+                                if isHolding then SafeCall(callback, key) end
                             end)
-                        else SafeCall(callback) end
+                        else SafeCall(callback, key) end
                     end
                 end)
                 SafeConnect(UserInputService.InputEnded, function(input, gp)
