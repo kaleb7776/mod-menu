@@ -1483,7 +1483,7 @@ function Library:CreateConfigTab(window)
         warn("[Ravion] CreateConfigTab: window inválida.")
         return nil
     end
-    local cfgTab = window:AddTab(" Config", "")
+    local cfgTab = window:AddTab("Config", Library:GetIcon("settings", "Material") or "⚙️")
     if not cfgTab then
         warn("[Ravion] CreateConfigTab: AddTab retornou nil.")
         return nil
