@@ -549,7 +549,7 @@ function Library:CreateWindow(configuration, toggleKey)
     local windowKeybind    = configuration.ToggleKey or Enum.KeyCode.RightControl
     local windowIcon       = tostring(configuration.Icon or "")
     local windowFolder     = tostring(configuration.Folder or "RavionUI")
-    local windowSize       = configuration.Size or UDim2.new(0, 600, 0, 400)
+    local windowSize       = configuration.Size or UDim2.new(0.75, 0, 0.75, 0)
     local windowMinSize    = configuration.MinSize or Vector2.new(400, 300)
     local windowMaxSize    = configuration.MaxSize or Vector2.new(1000, 800)
     local hideFooter       = configuration.HideFooter ~= false
